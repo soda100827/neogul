@@ -33,8 +33,20 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
+local SilentFile = "Rivals_SilentMode.txt"
+local IsSilent = isfile and isfile(SilentFile) and readfile(SilentFile) == "true"
+
 local Options = Fluent.Options
 local Misc = Tabs.Misc
+
+local SilentModeToggle = Misc:AddToggle("SilentMode", {Title = "Silent Mode (Start Hidden)", Default = IsSilent })
+SilentModeToggle:OnChanged(function(v) 
+    if writefile then writefile(SilentFile, tostring(v)) end 
+end)
+
+if IsSilent then 
+    Window:Minimize() 
+end
 
 
 local UnlockAll = Misc:AddToggle("UnlockAll", {Title = "Unlock All Cosmetics", Default = false })
@@ -585,32 +597,62 @@ end
 
 -- // Combat Features //
 
--- // Silent Aim Feature //
-local SilentAim = Tabs.Combat:AddToggle("SilentAim", {Title = "Silent Aim", Default = false })
-local SilentAimFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "Silent Aim FOV (Circle)", Default = false })
-local SilentAimRadius = Tabs.Combat:AddSlider("SilentAimRadius", {
+-- [[ Silent Aim Variables ]] --
+local SilentSettings = {
+    Enabled = false,
+    FOV = 180,
+    ShowFOV = false,
+    TargetPart = "Head",
+    HitChance = 100,
+    Prediction = 0.135,
+    DebugMode = false
+}
+
+local TargetBodyPart = nil
+local TargetVelocity = Vector3.zero
+
+-- [[ Silent Aim UI ]] --
+local SilentSection = Tabs.Combat:AddSection("Silent Aim")
+
+local ToggleSilentAvg = Tabs.Combat:AddToggle("SilentAim", {Title = "Enabled", Default = false })
+ToggleSilentAvg:OnChanged(function(v) SilentSettings.Enabled = v end)
+
+local ToggleFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "Show FOV", Default = false })
+ToggleFOV:OnChanged(function(v) SilentSettings.ShowFOV = v; FOVCircle.Visible = v end)
+
+local SliderFOV = Tabs.Combat:AddSlider("SilentAimRadius", {
     Title = "FOV Radius",
-    Description = "Radius of the FOV circle",
-    Default = 100,
+    Default = 180,
     Min = 10,
-    Max = 1000,
-    Rounding = 1,
-    Callback = function(Value) end
+    Max = 800,
+    Rounding = 0,
+    Callback = function(v) SilentSettings.FOV = v; FOVCircle.Radius = v end
 })
-local SilentAimHitChance = Tabs.Combat:AddSlider("SilentAimHitChance", {
+
+local SliderChance = Tabs.Combat:AddSlider("SilentAimHitChance", {
     Title = "Hit Chance",
-    Description = "Chance of hitting the target (0-100)",
     Default = 100,
     Min = 0,
     Max = 100,
-    Rounding = 1,
-    Callback = function(Value) end
+    Rounding = 0,
+    Callback = function(v) SilentSettings.HitChance = v end
 })
-local SilentAimPart = Tabs.Combat:AddDropdown("SilentAimPart", {
+
+local SliderPred = Tabs.Combat:AddSlider("SilentAimPrediction", {
+    Title = "Prediction",
+    Default = 0.135,
+    Min = 0,
+    Max = 1,
+    Rounding = 3,
+    Callback = function(v) SilentSettings.Prediction = v end
+})
+
+local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {
     Title = "Target Part",
-    Values = {"Head", "HumanoidRootPart", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"},
-    Multi = false,
-    Default = 1,
+    Values = {"Head", "HumanoidRootPart", "Random"}, 
+    Default = "Head", 
+    Multi = false, 
+    Callback = function(v) SilentSettings.TargetPart = v end
 })
 
 -- FOV Circle Visual
@@ -622,59 +664,94 @@ FOVCircle.Filled = false
 FOVCircle.Transparency = 1
 FOVCircle.NumSides = 64
 
-RunService.RenderStepped:Connect(function()
-    FOVCircle.Radius = Options.SilentAimRadius.Value
-    FOVCircle.Position = UserInputService:GetMouseLocation()
-    FOVCircle.Visible = Options.SilentAimFOV.Value
-end)
+-- [[ Silent Aim Functions ]] --
+local function GetTargetPart(character)
+    if SilentSettings.TargetPart == "Random" then
+        local parts = {"Head", "HumanoidRootPart", "UpperTorso"}
+        return character:FindFirstChild(parts[math.random(1, #parts)]) or character:FindFirstChild("Head")
+    else
+        return character:FindFirstChild(SilentSettings.TargetPart)
+    end
+end
 
-local function getClosestPlayerToCursor()
-    local target = nil
-    local shortestDist = math.huge
+local function GetClosestTarget()
+    local closestPart = nil
+    local closestVelocity = Vector3.zero
+    local maxDistance = SilentSettings.FOV
     local mousePos = UserInputService:GetMouseLocation()
-    
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
 
-            
-            local part = p.Character:FindFirstChild(SilentAimPart.Value) or p.Character:FindFirstChild("Head")
-            if part then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if dist < shortestDist then
-                        if Options.SilentAimFOV.Value and dist > Options.SilentAimRadius.Value then continue end
-                        target = part
-                        shortestDist = dist
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hum = player.Character:FindFirstChild("Humanoid")
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            if hum and root and hum.Health > 0 then
+                -- Team Check (Optional usually in FFA but good to have)
+                if player.Team == LocalPlayer.Team and player.Team ~= nil then
+                    -- Continue
+                else
+                    local part = GetTargetPart(player.Character)
+                    if part then
+                        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                        if onScreen then
+                            local dist = (mousePos - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                            if dist < maxDistance then
+                                closestPart = part
+                                closestVelocity = root.Velocity
+                                maxDistance = dist
+                            end
+                        end
                     end
                 end
             end
         end
     end
-    return target
+    return closestPart, closestVelocity
 end
 
--- Hook Raycast for Silent Aim
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    FOVCircle.Visible = SilentSettings.ShowFOV and SilentSettings.Enabled
+    FOVCircle.Radius = SilentSettings.FOV
+    if SilentSettings.Enabled then
+        TargetBodyPart, TargetVelocity = GetClosestTarget()
+    else
+        TargetBodyPart = nil
+    end
+end)
+
+-- [[ Universal Hooking (Range + Prediction) ]] --
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     local args = {...}
-    
-    if method == "Raycast" and Options.SilentAim.Value then
-        if math.random(1, 100) <= Options.SilentAimHitChance.Value then
-            local target = getClosestPlayerToCursor()
-            if target then
-                -- Validate arguments before math operations
+
+    if method == "Raycast" and SilentSettings.Enabled and TargetBodyPart then
+        -- Validate Vectors without verifying script name (Universal)
+        if typeof(args[1]) == "Vector3" and typeof(args[2]) == "Vector3" then
+            
+            -- Hit Chance Check
+            if math.random(1, 100) <= SilentSettings.HitChance then
                 local origin = args[1]
-                local direction = args[2]
-                if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-                     args[2] = (target.Position - origin).Unit * 1000
-                     return oldNamecall(self, table.unpack(args))
+                local oldDirection = args[2]
+                local weaponRange = oldDirection.Magnitude
+                
+                -- Only consider raycasts that travel significant distance (likely bullets)
+                if weaponRange > 10 then
+                    -- Calculate Predicted Position
+                    local predictedPos = TargetBodyPart.Position + (TargetVelocity * SilentSettings.Prediction)
+                    
+                    -- Update Direction: (Predicted - Origin).Unit * Range
+                    args[2] = (predictedPos - origin).Unit * weaponRange
+                    
+                    if SilentSettings.DebugMode then
+                        print("[Silent Aim] Hitting:", TargetBodyPart.Parent.Name, "| Range:", weaponRange)
+                    end
+                    
+                    return oldNamecall(self, unpack(args))
                 end
             end
         end
     end
-    
     return oldNamecall(self, ...)
 end)
 
