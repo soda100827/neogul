@@ -410,21 +410,32 @@ task.spawn(function()
         "쪼준CEO",
         "쪼준컴퍼니 입사함"
     }
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local DefaultChatSystemChatEvents = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents", 5)
-    local SayMessageRequest = DefaultChatSystemChatEvents and DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
     
     while true do
-        task.wait(1)
+        task.wait(3) -- Adjusted wait time to 3s per user example
         if Options.SpamMessage and Options.SpamMessage.Value then
             local msg = messages[math.random(1, #messages)]
             
-            if SayMessageRequest then
-                SayMessageRequest:FireServer(msg, "All")
-            end
+            pcall(function()
+                local TextChatService = game:GetService("TextChatService")
+                if TextChatService and TextChatService.TextChannels and TextChatService.TextChannels.RBXGeneral then
+                    TextChatService.TextChannels.RBXGeneral:SendAsync(msg)
+                else
+                    -- Fallback for legacy games
+                     local ReplicatedStorage = game:GetService("ReplicatedStorage")
+                     local DefaultChatSystemChatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+                     local SayMessageRequest = DefaultChatSystemChatEvents and DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
+                     if SayMessageRequest then
+                         SayMessageRequest:FireServer(msg, "All")
+                     else
+                         game:GetService("Players"):Chat(msg)
+                     end
+                end
+            end)
         end
     end
 end)
+
 
 local AutoLoad = Misc:AddToggle("AutoLoad", {Title = "Auto Load Script", Default = false })
 AutoLoad:OnChanged(function()
