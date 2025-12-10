@@ -592,14 +592,21 @@ local SilentSettings = {
     TargetPart = "Head",
     HitChance = 100,
     Prediction = 0.135,
-    DebugMode = false
+    DebugMode = false,
+    
+    -- Advanced
+    VisibleCheck = false,
+    TeamCheck = true,
+    SmartTargeting = false, -- Scans for closest bone instead of fixed
+    MaxDistance = 1000,
+    AutoFire = false
 }
 
 local TargetBodyPart = nil
 local TargetVelocity = Vector3.zero
 
 -- [[ Silent Aim UI ]] --
-local SilentSection = Tabs.Combat:AddSection("Silent Aim")
+local SilentSection = Tabs.Combat:AddSection("Silent Aim Config")
 
 local ToggleSilentAvg = Tabs.Combat:AddToggle("SilentAim", {Title = "Enabled", Default = false })
 ToggleSilentAvg:OnChanged(function(v) SilentSettings.Enabled = v end)
@@ -607,40 +614,19 @@ ToggleSilentAvg:OnChanged(function(v) SilentSettings.Enabled = v end)
 local ToggleFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "Show FOV", Default = false })
 ToggleFOV:OnChanged(function(v) SilentSettings.ShowFOV = v; FOVCircle.Visible = v end)
 
-local SliderFOV = Tabs.Combat:AddSlider("SilentAimRadius", {
-    Title = "FOV Radius",
-    Default = 180,
-    Min = 10,
-    Max = 800,
-    Rounding = 0,
-    Callback = function(v) SilentSettings.FOV = v; FOVCircle.Radius = v end
-})
+Tabs.Combat:AddSlider("SilentAimRadius", {Title = "FOV Radius", Default = 180, Min = 10, Max = 800, Rounding = 0, Callback = function(v) SilentSettings.FOV = v; FOVCircle.Radius = v end})
+Tabs.Combat:AddSlider("SilentAimHitChance", {Title = "Hit Chance", Default = 100, Min = 0, Max = 100, Rounding = 0, Callback = function(v) SilentSettings.HitChance = v end})
+Tabs.Combat:AddSlider("SilentAimPrediction", {Title = "Prediction", Default = 0.135, Min = 0, Max = 1, Rounding = 3, Callback = function(v) SilentSettings.Prediction = v end})
 
-local SliderChance = Tabs.Combat:AddSlider("SilentAimHitChance", {
-    Title = "Hit Chance",
-    Default = 100,
-    Min = 0,
-    Max = 100,
-    Rounding = 0,
-    Callback = function(v) SilentSettings.HitChance = v end
-})
+local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {Title = "Target Part", Values = {"Head", "HumanoidRootPart", "Random"}, Default = "Head", Multi = false, Callback = function(v) SilentSettings.TargetPart = v end})
 
-local SliderPred = Tabs.Combat:AddSlider("SilentAimPrediction", {
-    Title = "Prediction",
-    Default = 0.135,
-    Min = 0,
-    Max = 1,
-    Rounding = 3,
-    Callback = function(v) SilentSettings.Prediction = v end
-})
+-- Detailed Settings
+local SilentDetailSection = Tabs.Combat:AddSection("Silent Aim Details")
+Tabs.Combat:AddToggle("SilentSmart", {Title = "Smart Targeting", Description = "Overwrites Target Part with Closest Bone", Default = false }):OnChanged(function(v) SilentSettings.SmartTargeting = v end)
+Tabs.Combat:AddToggle("SilentVisible", {Title = "Visible Check", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
+Tabs.Combat:AddToggle("SilentTeam", {Title = "Team Check", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end)
+Tabs.Combat:AddSlider("SilentDist", {Title = "Max Distance", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
 
-local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {
-    Title = "Target Part",
-    Values = {"Head", "HumanoidRootPart", "Random"}, 
-    Default = "Head", 
-    Multi = false, 
-    Callback = function(v) SilentSettings.TargetPart = v end
-})
 
 -- FOV Circle Visual
 local FOVCircle = Drawing.new("Circle")
@@ -652,40 +638,77 @@ FOVCircle.Transparency = 1
 FOVCircle.NumSides = 64
 
 -- [[ Silent Aim Functions ]] --
-local function GetTargetPart(character)
-    if SilentSettings.TargetPart == "Random" then
-        local parts = {"Head", "HumanoidRootPart", "UpperTorso"}
-        return character:FindFirstChild(parts[math.random(1, #parts)]) or character:FindFirstChild("Head")
-    else
-        return character:FindFirstChild(SilentSettings.TargetPart)
-    end
-end
-
 local function GetClosestTarget()
     local closestPart = nil
     local closestVelocity = Vector3.zero
     local maxDistance = SilentSettings.FOV
     local mousePos = UserInputService:GetMouseLocation()
+    local myPos = Camera.CFrame.Position
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local hum = player.Character:FindFirstChild("Humanoid")
             local root = player.Character:FindFirstChild("HumanoidRootPart")
             if hum and root and hum.Health > 0 then
-                -- Team Check (Optional usually in FFA but good to have)
-                if player.Team == LocalPlayer.Team and player.Team ~= nil then
-                    -- Continue
+                
+                -- Team Check
+                if SilentSettings.TeamCheck and player.Team == LocalPlayer.Team then continue end
+                
+                -- Max Distance Check
+                if (root.Position - myPos).Magnitude > SilentSettings.MaxDistance then continue end
+                
+                -- Determine Target Part
+                local part = nil
+                
+                if SilentSettings.SmartTargeting then
+                    -- Find closest visible part to cursor
+                    local partsToCheck = {"Head", "HumanoidRootPart", "UpperTorso", "LeftHand", "RightHand"}
+                    local bestBoneDist = math.huge
+                    
+                    for _, boneName in ipairs(partsToCheck) do
+                        local bone = player.Character:FindFirstChild(boneName)
+                        if bone then
+                             local sPos, sOn = Camera:WorldToViewportPoint(bone.Position)
+                             if sOn then
+                                 local d = (Vector2.new(sPos.X, sPos.Y) - mousePos).Magnitude
+                                 if d < bestBoneDist then
+                                     bestBoneDist = d
+                                     part = bone
+                                 end
+                             end
+                        end
+                    end
                 else
-                    local part = GetTargetPart(player.Character)
-                    if part then
-                        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                        if onScreen then
-                            local dist = (mousePos - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-                            if dist < maxDistance then
-                                closestPart = part
-                                closestVelocity = root.Velocity
-                                maxDistance = dist
-                            end
+                    if SilentSettings.TargetPart == "Random" then
+                        local parts = {"Head", "HumanoidRootPart", "UpperTorso"}
+                        part = player.Character:FindFirstChild(parts[math.random(1, #parts)]) or player.Character:FindFirstChild("Head")
+                    else
+                        part = player.Character:FindFirstChild(SilentSettings.TargetPart)
+                    end
+                end
+                
+                if part then
+                    -- Visibility Check
+                    if SilentSettings.VisibleCheck then
+                         local origin = myPos
+                         local direction = part.Position - origin
+                         local rayParams = RaycastParams.new()
+                         rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+                         rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                         rayParams.IgnoreWater = true
+                         local res = workspace:Raycast(origin, direction, rayParams)
+                         if res and not res.Instance:IsDescendantOf(player.Character) then
+                             continue -- Obscured
+                         end
+                    end
+                
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local dist = (mousePos - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                        if dist < maxDistance then
+                            closestPart = part
+                            closestVelocity = root.Velocity
+                            maxDistance = dist
                         end
                     end
                 end
