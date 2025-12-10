@@ -1,9 +1,9 @@
 getgenv().Config = {
-	Invite = "informant.wtf",
+	Invite = "neogul",
 	Version = "0.0",
 }
 
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/soda100827/neogul/refs/heads/main/uilib.luau"))()
+local library = loadstring(readfile("rivals_neogul/uilib.luau"))()
 
 library:init() -- Initalizes Library Do Not Delete This
 
@@ -13,7 +13,7 @@ local Window = library.NewWindow({
 })
 
 local tabs = {
-    Tab1 = Window:AddTab("Tab1"),
+    Main = Window:AddTab("Main"),
 	Settings = library:CreateSettingsTab(Window),
 }
 
@@ -21,11 +21,14 @@ local tabs = {
 -- 2 = Set Section Box To The Right
 
 local sections = {
-	Section1 = tabs.Tab1:AddSection("Section1", 1),
-	Section2 = tabs.Tab1:AddSection("Section2", 2),
+	Combat = tabs.Main:AddSection("Combat", 1),
+	Visuals = tabs.Main:AddSection("Visuals", 2),
 }
 
-sections.Section1:AddToggle({
+local Combat = sections.Combat
+local Visuals = sections.Visuals
+
+Combat:AddToggle({
 	enabled = true,
 	text = "Toggle1",
 	flag = "Toggle_1",
@@ -36,7 +39,7 @@ sections.Section1:AddToggle({
 	end
 })
 
-sections.Section1:AddButton({
+Combat:AddButton({
 	enabled = true,
 	text = "Button1",
 	flag = "Button_1",
@@ -48,11 +51,11 @@ sections.Section1:AddButton({
 	end
 })
 
-sections.Section1:AddSeparator({
+Combat:AddSeparator({
 	text = "Separator"
 })
 
-sections.Section1:AddSlider({
+Combat:AddSlider({
 	text = "Slider", 
 	flag = 'Slider_1', 
 	suffix = "", 
@@ -67,7 +70,7 @@ sections.Section1:AddSlider({
 	end
 })
 
-sections.Section1:AddBind({
+Combat:AddBind({
 	text = "Keybind",
 	flag = "Key_1",
 	nomouse = true,
@@ -81,7 +84,7 @@ sections.Section1:AddBind({
 	end
 })
 
-sections.Section1:AddList({
+Combat:AddList({
 	enabled = true,
 	text = "List",
 	flag = "List_1",
@@ -101,7 +104,7 @@ sections.Section1:AddList({
 	end
 })
 
-sections.Section1:AddBox({
+Combat:AddBox({
     enabled = true,
     focused = true,
     text = "TextBox1",
@@ -113,14 +116,14 @@ sections.Section1:AddBox({
 	end
 })
 
-sections.Section1:AddText({
+Combat:AddText({
     enabled = true,
     text = "Text1",
     flag = "Text_1",
     risky = false,
 })
 
-sections.Section1:AddColor({
+Combat:AddColor({
     enabled = true,
     text = "ColorPicker1",
     flag = "Color_1",

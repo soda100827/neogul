@@ -1,4 +1,4 @@
---너굴 수정
+--너굴 수정2
 
 local startupArgs = ...
 if type(startupArgs) ~= 'table' then
@@ -595,6 +595,12 @@ function library:init()
                     elseif option.class == 'box' then
                         option:SetInput(value == nil and '' or value)
                     end
+                else
+                    if typeof(value) == 'table' then 
+                         -- Handle color/trans/list special cases later if needed, but for now simple storage
+                         -- Color is stored as array {r,g,b,trans}
+                    end
+                    library.flags[flag] = value
                 end
             end
             setByConfig = false
@@ -651,6 +657,10 @@ function library:init()
         if name then
             self:LoadConfig(name)
         end
+    end
+
+    function self:init()
+        self:LoadAutoloadConfig()
     end
 
     function self:SetSilentMode(bool)
@@ -2074,6 +2084,9 @@ function library:init()
                     table.insert(self.options, toggle)
 
                     if toggle.flag then
+                        if library.flags[toggle.flag] ~= nil then
+                            toggle.state = library.flags[toggle.flag]
+                        end
                         library.flags[toggle.flag] = toggle.state;
                         library.options[toggle.flag] = toggle;
                     end
@@ -2223,6 +2236,9 @@ function library:init()
                         table.insert(self.options, color)
     
                         if color.flag then
+                            if library.flags[color.flag] ~= nil then
+                                color.color = library.flags[color.flag]
+                            end
                             library.flags[color.flag] = color.color;
                             library.options[color.flag] = color;
                         end
@@ -2372,6 +2388,9 @@ function library:init()
                         table.insert(self.options, bind)
     
                         if bind.flag then
+                            if library.flags[bind.flag] ~= nil then
+                                bind.state = library.flags[bind.flag]
+                            end
                             library.options[bind.flag] = bind;
                         end
 
@@ -2561,6 +2580,9 @@ function library:init()
                         table.insert(self.options, slider)
 
                         if slider.flag then
+                            if library.flags[slider.flag] ~= nil then
+                                slider.value = library.flags[slider.flag]
+                            end
                             library.flags[slider.flag] = slider.value;
                             library.options[slider.flag] = slider;
                         end
@@ -2739,6 +2761,9 @@ function library:init()
                         end
     
                         if list.flag then
+                            if library.flags[list.flag] ~= nil then
+                                list.selected = library.flags[list.flag]
+                            end
                             library.flags[list.flag] = list.selected;
                             library.options[list.flag] = list;
                         end
@@ -2935,6 +2960,9 @@ function library:init()
                     table.insert(self.options, slider)
 
                     if slider.flag then
+                        if library.flags[slider.flag] ~= nil then
+                            slider.value = library.flags[slider.flag]
+                        end
                         library.flags[slider.flag] = slider.value;
                         library.options[slider.flag] = slider;
                     end
@@ -3577,6 +3605,9 @@ function library:init()
                     table.insert(self.options, color)
 
                     if color.flag then
+                        if library.flags[color.flag] ~= nil then
+                            color.color = library.flags[color.flag]
+                        end
                         library.flags[color.flag] = color.color;
                         library.options[color.flag] = color;
                     end
@@ -3737,6 +3768,9 @@ function library:init()
                     table.insert(self.options, box)
 
                     if box.flag then
+                        if library.flags[box.flag] ~= nil then
+                            box.input = library.flags[box.flag]
+                        end
                         library.flags[box.flag] = box.input;
                         library.options[box.flag] = box;
                     end
@@ -3966,6 +4000,9 @@ function library:init()
                     table.insert(self.options, bind)
 
                     if bind.flag then
+                        if library.flags[bind.flag] ~= nil then
+                            bind.state = library.flags[bind.flag]
+                        end
                         library.options[bind.flag] = bind;
                     end
 
@@ -4691,7 +4728,6 @@ function library:CreateSettingsTab(menu)
         end
     end})
 
-    autoloadLabel = configSection:AddText({text = 'Current Autoload: '..(library:GetAutoloadConfig() or 'None')})
 
     configSection:AddButton({text = 'Create', confirm = false, callback = function()
         if library.flags.configinput == "" then 
@@ -4708,6 +4744,8 @@ function library:CreateSettingsTab(menu)
             refreshConfigs()
         end
     end})
+
+    autoloadLabel = configSection:AddText({text = 'Current Autoload: '..(library:GetAutoloadConfig() or 'None')})
 
     refreshConfigs()
 
