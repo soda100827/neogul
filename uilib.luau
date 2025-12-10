@@ -1,12 +1,13 @@
---[[
-Octohook ui lib informant version
-Developed by liam#4567
-Edited by xz#1111
-]]
+-- Octohook ui lib informant version
+-- Developed by liam#4567
+-- Edited by xz#1111
 
 -- // Load
 
-local startupArgs = ({...})[1] or {}
+local startupArgs = ...
+if type(startupArgs) ~= 'table' then
+    startupArgs = {}
+end
 
 if getgenv().library ~= nil then
     getgenv().library:Unload();
