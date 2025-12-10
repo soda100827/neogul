@@ -836,7 +836,7 @@ AimToggle:OnChanged(function(v) AimbotSettings.Enabled = v end)
 local AimKey = Tabs.Combat:AddKeybind("AimbotKey", {
     Title = "작동 키 (꾹 누르기)",
     Mode = "Hold",
-    Default = Enum.KeyCode.LeftAlt,
+    Default = "LeftAlt",
     ChangedCallback = function(New) end
 })
 
