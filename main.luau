@@ -35,7 +35,7 @@ Combat:AddToggle({
 	tooltip = "Tooltip1",
 	risky = true, -- turns text to red and sets label to risky
 	callback = function(lol)
-	    print("Toggle Is Now Set To : ".. lol)
+	    print("Toggle Is Now Set To : ".. tostring(lol))
 	end
 })
 

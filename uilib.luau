@@ -653,7 +653,9 @@ function library:init()
     function self:LoadAutoloadConfig()
         local name = self:GetAutoloadConfig()
         if name then
+            print("Autoload config found: "..name)
             self:LoadConfig(name)
+            library:SendNotification("Autoload Loaded: "..name, 5, Color3.new(0, 1, 0))
         end
     end
 
@@ -2074,7 +2076,7 @@ function library:init()
 
                     local blacklist = {'objects'};
                     for i,v in next, data do
-                        if not table.find(blacklist, i) ~= toggle[i] ~= nil then
+                        if not table.find(blacklist, i) and toggle[i] ~= nil then
                             toggle[i] = v
                         end
                     end
@@ -2084,7 +2086,12 @@ function library:init()
                     local shouldCallback = false 
                     if toggle.flag then
                         if library.flags[toggle.flag] ~= nil then
-                            toggle.state = library.flags[toggle.flag]
+                            local val = library.flags[toggle.flag]
+                            if type(val) == "number" then
+                                toggle.state = (val == 1)
+                            else
+                                toggle.state = val
+                            end
                             shouldCallback = true
                         end
                         library.flags[toggle.flag] = toggle.state;
@@ -3618,7 +3625,13 @@ function library:init()
                     local shouldCallback = false
                     if color.flag then
                         if library.flags[color.flag] ~= nil then
-                            color.color = library.flags[color.flag]
+                            local val = library.flags[color.flag]
+                            if type(val) == "table" then
+                                color.color = Color3.new(val[1], val[2], val[3])
+                                color.trans = val[4] or 0
+                            else
+                                color.color = val
+                            end
                             shouldCallback = true
                         end
                         library.flags[color.flag] = color.color;
@@ -4017,8 +4030,37 @@ function library:init()
                     local shouldCallback = false
                     if bind.flag then
                         if library.flags[bind.flag] ~= nil then
-                            bind.state = library.flags[bind.flag]
-                            shouldCallback = true
+                            -- For Binds, the cached flag is the Key Name (string) or KeyCode
+                            -- We need to store it to apply later with SetBind
+                            bind.bind = library.flags[bind.flag] -- temporarily store raw value
+                            -- Convert back to Enum if possible here, or let SetBind handle it?
+                            -- SetBind logic:
+                            -- option:SetBind(value == nil and 'none' or (utility:HasProperty(Enum.KeyCode, value) and Enum.KeyCode[value] or Enum.UserInputType[value]));
+                            -- AddBind implementation of SetBind handles string parsing if we pass it later.
+                            -- But we need to update the internal 'bind' field now if SetBind isn't called yet?
+                            -- Actually bind:SetBind IS called at the end of this function.
+                            -- So updating bind.bind here is correct.
+                            
+                            -- BUT bind.state is for the active/inactive toggle state? 
+                            -- Binds in this library seem to just be a key that triggers a callback.
+                            -- Wait, bind.state exists.
+                            -- Is state persisted?
+                            -- SaveConfig only saves the Key code.
+                            -- So we don't restore state (active/inactive). We just restore the Key Bind.
+                            
+                            -- So this was wrong:
+                            -- bind.state = library.flags[bind.flag]
+                            
+                            -- Correct is:
+                            -- bind.bind = library.flags[bind.flag]
+                            -- And we should NOT set shouldCallback = true because changing the keybind doesn't usually trigger the callback immediately?
+                            -- Or does it?
+                            -- If "shouldCallback" is true, at the end we call bind.callback(bind.state).
+                            -- But bind.state defaults to false.
+                            -- If we just load the key, we shouldn't trigger the action.
+                            
+                            -- Reverting shouldCallback to false for Bind since we are just restoring the key configuration.
+                            shouldCallback = false 
                         end
                         library.options[bind.flag] = bind;
                     end
@@ -4082,6 +4124,17 @@ function library:init()
                     end
 
                     function bind:SetBind(keybind)
+                        local keyName = 'NONE'
+                        
+                        -- Parsing logic similar to LoadConfig
+                        if typeof(keybind) == 'string' and keybind ~= 'none' then
+                             if utility:HasProperty(Enum.KeyCode, keybind) then
+                                keybind = Enum.KeyCode[keybind]
+                             elseif utility:HasProperty(Enum.UserInputType, keybind) then
+                                keybind = Enum.UserInputType[keybind]
+                             end
+                        end
+                        
                         if c then
                             c:Disconnect();
                             if bind.flag then
@@ -4156,7 +4209,7 @@ function library:init()
 
                     tooltip(bind);
                     bind:SetBind(bind.bind);
-                    if shouldCallback then bind.callback(bind.state) end
+                    -- if shouldCallback then bind.callback(bind.state) end -- removed because we don't want to trigger on load for binds
                     bind:SetText(bind.text);
                     self:UpdateOptions();
                     return bind
@@ -4184,12 +4237,17 @@ function library:init()
 
                     local blacklist = {'objects'};
                     for i,v in next, data do
-                        if not table.find(blacklist, i) ~= list[i] ~= nil then
+                        if not table.find(blacklist, i) and list[i] ~= nil then
                             list[i] = v
                         end
                     end
 
+                    local shouldCallback = false 
                     if list.flag then
+                        if library.flags[list.flag] ~= nil then
+                            list.selected = library.flags[list.flag]
+                            shouldCallback = true
+                        end
                         library.flags[list.flag] = list.selected;
                         library.options[list.flag] = list;
                     end
@@ -4360,7 +4418,7 @@ function library:init()
                     end
 
                     tooltip(list);
-                    list:Select((data.value or data.selected) or (list.multi and 'none' or list.values[1]), true);
+                    list:Select((data.value or data.selected) or (list.multi and 'none' or list.values[1]), not shouldCallback);
                     list:SetText(list.text);
                     self:UpdateOptions();
                     return list
