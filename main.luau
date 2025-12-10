@@ -662,22 +662,16 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     
     if method == "Raycast" and Options.SilentAim.Value then
         if math.random(1, 100) <= Options.SilentAimHitChance.Value then
-             local callingScript = getcallingscript()
-             local validScripts = {
-                ["Equipment"] = true,
-                ["FighterController"] = true
-             }
-             
-             if validScripts[tostring(callingScript)] then
-                local target = getClosestPlayerToCursor()
-                if target then
-                    local origin = args[1]
-                    if typeof(origin) == "Vector3" then
-                         args[2] = (target.Position - origin).Unit * 1000
-                         return oldNamecall(self, table.unpack(args))
-                    end
+            local target = getClosestPlayerToCursor()
+            if target then
+                -- Validate arguments before math operations
+                local origin = args[1]
+                local direction = args[2]
+                if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
+                     args[2] = (target.Position - origin).Unit * 1000
+                     return oldNamecall(self, table.unpack(args))
                 end
-             end
+            end
         end
     end
     
