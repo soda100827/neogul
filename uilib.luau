@@ -1,4 +1,4 @@
---쪼준면
+--너굴 수정
 
 local startupArgs = ...
 if type(startupArgs) ~= 'table' then
@@ -4679,13 +4679,19 @@ function library:CreateSettingsTab(menu)
         end
     end
 
+    local autoloadLabel;
     configSection:AddButton({text = 'Load', confirm = false, callback = function()
         library:LoadConfig(library.flags.selectedconfig);
     end}):AddButton({text = 'Save', confirm = true, callback = function()
         library:SaveConfig(library.flags.selectedconfig);
     end}):AddButton({text = 'Set as Autoload', confirm = true, callback = function()
         library:SetAutoloadConfig(library.flags.selectedconfig);
+        if autoloadLabel then
+            autoloadLabel:SetText('Current Autoload: '..(library:GetAutoloadConfig() or 'None'))
+        end
     end})
+
+    autoloadLabel = configSection:AddText({text = 'Current Autoload: '..(library:GetAutoloadConfig() or 'None')})
 
     configSection:AddButton({text = 'Create', confirm = false, callback = function()
         if library.flags.configinput == "" then 

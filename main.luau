@@ -8,7 +8,7 @@ local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/soda1
 library:init() -- Initalizes Library Do Not Delete This
 
 local Window = library.NewWindow({
-	title = "Informant.Wtf",
+	title = "Neogul's Rivals Scripts",
 	size = UDim2.new(0, 525, 0, 650)
 })
 
