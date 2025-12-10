@@ -605,6 +605,15 @@ local SilentSettings = {
 local TargetBodyPart = nil
 local TargetVelocity = Vector3.zero
 
+-- FOV Circle Visual
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.NumSides = 64
+
 -- [[ Silent Aim UI ]] --
 local SilentSection = Tabs.Combat:AddSection("Silent Aim Config")
 
@@ -612,9 +621,9 @@ local ToggleSilentAvg = Tabs.Combat:AddToggle("SilentAim", {Title = "Enabled", D
 ToggleSilentAvg:OnChanged(function(v) SilentSettings.Enabled = v end)
 
 local ToggleFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "Show FOV", Default = false })
-ToggleFOV:OnChanged(function(v) SilentSettings.ShowFOV = v; FOVCircle.Visible = v end)
+ToggleFOV:OnChanged(function(v) SilentSettings.ShowFOV = v; if FOVCircle then FOVCircle.Visible = v end end)
 
-Tabs.Combat:AddSlider("SilentAimRadius", {Title = "FOV Radius", Default = 180, Min = 10, Max = 800, Rounding = 0, Callback = function(v) SilentSettings.FOV = v; FOVCircle.Radius = v end})
+Tabs.Combat:AddSlider("SilentAimRadius", {Title = "FOV Radius", Default = 180, Min = 10, Max = 800, Rounding = 0, Callback = function(v) SilentSettings.FOV = v; if FOVCircle then FOVCircle.Radius = v end end})
 Tabs.Combat:AddSlider("SilentAimHitChance", {Title = "Hit Chance", Default = 100, Min = 0, Max = 100, Rounding = 0, Callback = function(v) SilentSettings.HitChance = v end})
 Tabs.Combat:AddSlider("SilentAimPrediction", {Title = "Prediction", Default = 0.135, Min = 0, Max = 1, Rounding = 3, Callback = function(v) SilentSettings.Prediction = v end})
 
@@ -626,16 +635,6 @@ Tabs.Combat:AddToggle("SilentSmart", {Title = "Smart Targeting", Description = "
 Tabs.Combat:AddToggle("SilentVisible", {Title = "Visible Check", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
 Tabs.Combat:AddToggle("SilentTeam", {Title = "Team Check", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end)
 Tabs.Combat:AddSlider("SilentDist", {Title = "Max Distance", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
-
-
--- FOV Circle Visual
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = false
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
-FOVCircle.NumSides = 64
 
 -- [[ Silent Aim Functions ]] --
 local function GetClosestTarget()
