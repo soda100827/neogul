@@ -117,10 +117,35 @@ task.spawn(function()
     end
 
     -- Hook Cosmetic Library
+    -- Hook Cosmetic Library
     local originalOwnsCosmetic = CosmeticLibrary.OwnsCosmetic
-    CosmeticLibrary.OwnsCosmeticNormally = function() return true end 
-    CosmeticLibrary.OwnsCosmeticUniversally = function() return true end
-    CosmeticLibrary.OwnsCosmeticForWeapon = function() return true end
+    local originalOwnsCosmeticNormally = CosmeticLibrary.OwnsCosmeticNormally
+    local originalOwnsCosmeticUniversally = CosmeticLibrary.OwnsCosmeticUniversally
+    local originalOwnsCosmeticForWeapon = CosmeticLibrary.OwnsCosmeticForWeapon
+
+    CosmeticLibrary.OwnsCosmeticNormally = function(...) 
+        if not Options.UnlockAll.Value then 
+            if originalOwnsCosmeticNormally then return originalOwnsCosmeticNormally(...) end
+            return false 
+        end
+        return true 
+    end 
+    
+    CosmeticLibrary.OwnsCosmeticUniversally = function(...) 
+        if not Options.UnlockAll.Value then 
+             if originalOwnsCosmeticUniversally then return originalOwnsCosmeticUniversally(...) end
+             return false
+        end
+        return true 
+    end
+
+    CosmeticLibrary.OwnsCosmeticForWeapon = function(...)
+        if not Options.UnlockAll.Value then
+            if originalOwnsCosmeticForWeapon then return originalOwnsCosmeticForWeapon(...) end
+            return false
+        end
+        return true 
+    end
 
     CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
         if not Options.UnlockAll.Value then return originalOwnsCosmetic(self, inventory, name, weapon) end
