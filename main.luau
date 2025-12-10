@@ -702,11 +702,13 @@ local function ScanForAttributes()
     for _, t in pairs(getgc(true)) do
         if type(t) == "table" then
             for _, attr in pairs(InterestedAttributes) do
-                if rawget(t, attr) ~= nil then
+                -- Safer check using pcall or just type checking
+                local success, val = pcall(function() return rawget(t, attr) end)
+                if success and val ~= nil then
                     -- Store original value if not cached
                     if not AttributeCache[t] then AttributeCache[t] = {} end
                     if AttributeCache[t][attr] == nil then
-                        AttributeCache[t][attr] = t[attr]
+                         AttributeCache[t][attr] = val -- Use the retrieved value
                     end
                     
                     -- Add to target list
