@@ -492,6 +492,15 @@ end)
 
 local AntiUnnamed = Misc:AddToggle("AntiUnnamed", {Title = "Anti Unnamed (God Mode)", Default = false })
 
+Misc:AddKeybind("AntiUnnamedKey", {
+    Title = "Anti Unnamed Keybind",
+    Mode = "Toggle",
+    Default = "RightAlt",
+    Callback = function(Value)
+        Options.AntiUnnamed:SetValue(Value)
+    end
+})
+
 -- Anti Unnamed Logic
 task.spawn(function()
     local RunService = game:GetService("RunService")
@@ -647,6 +656,7 @@ Tabs.Combat:AddToggle("SilentSmart", {Title = "스마트 타겟팅", Description
 Tabs.Combat:AddToggle("SilentVisible", {Title = "벽 구분 (보이는 적만)", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
 -- Tabs.Combat:AddToggle("SilentTeam", {Title = "팀 구분 (아군 제외)", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end) -- Removed as per request
 Tabs.Combat:AddSlider("SilentDist", {Title = "최대 사거리", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
+Tabs.Combat:AddToggle("SilentAutoFire", {Title = "자동 발사 (Auto Fire)", Default = false }):OnChanged(function(v) SilentSettings.AutoFire = v end)
 
 -- [[ Silent Aim Functions ]] --
 local function GetClosestTarget()
@@ -863,6 +873,25 @@ Tabs.Combat:AddSlider("AimbotSmooth", {Title = "부드러움 (Smoothing)", Defau
 
 Tabs.Combat:AddSlider("AimbotReaction", {Title = "반응 지연 (초)", Default = 0.15, Min = 0, Max = 0.5, Rounding = 2, Callback = function(v) AimbotSettings.ReactionDelay = v end})
 
+-- TriggerBot Settings
+local TriggerBotSettings = {
+    Enabled = false,
+    Delay = 0.1,
+    TeamCheck = true,
+    LastFire = 0
+}
+
+local TriggerSection = Tabs.Combat:AddSection("트리거봇 (TriggerBot)")
+Tabs.Combat:AddToggle("TriggerBotEnabled", {Title = "활성화", Default = false }):OnChanged(function(v) TriggerBotSettings.Enabled = v end)
+Tabs.Combat:AddKeybind("TriggerBotKey", {
+    Title = "작동 키 (Hold)",
+    Mode = "Hold",
+    Default = "LeftAlt",
+    ChangedCallback = function(New) end
+})
+Tabs.Combat:AddSlider("TriggerBotDelay", {Title = "발사 지연", Default = 0.05, Min = 0, Max = 1, Rounding = 2, Callback = function(v) TriggerBotSettings.Delay = v end})
+Tabs.Combat:AddToggle("TriggerBotTeamCheck", {Title = "팀원 무시", Default = true }):OnChanged(function(v) TriggerBotSettings.TeamCheck = v end)
+
 -- [[ Spring Module (Internal) ]] --
 local Spring = {}
 Spring.__index = Spring
@@ -968,130 +997,192 @@ local function GetBestAimTarget()
 end
 
 -- Calculation & Application Loop
+-- Calculation & Application Loop
 RunService.RenderStepped:Connect(function(dt)
-    if not AimbotSettings.Enabled then return end
-    
-    local keyState = Options.AimbotKey and Options.AimbotKey:GetState()
-    if not keyState then 
-        AimbotSettings.Target = nil
-        AimbotSettings.CurveOffset = Vector3.zero
-        return 
+    -- Check if ANY combat feature is enabled
+    if not (AimbotSettings.Enabled or TriggerBotSettings.Enabled or (SilentSettings.Enabled and SilentSettings.AutoFire)) then return end
+
+    -- Ensure Camera is valid
+    if not Camera or not Camera.Parent then
+        Camera = workspace.CurrentCamera
+        return
     end
-    
-    local target = nil
-    
-    -- Sticky Aim Implementation
-    if AimbotSettings.StickyAim and AimbotSettings.Target then
-        local sticky = AimbotSettings.Target
-        if sticky and sticky.Parent and sticky.Parent:FindFirstChild("Humanoid") and sticky.Parent.Humanoid.Health > 0 then
-             local visible = true
-             if AimbotSettings.VisibleCheck then
-                 visible = IsVisible(sticky, {LocalPlayer.Character, Camera})
+
+    ---------------------------
+    -- 1. Aimbot Logic
+    ---------------------------
+    if AimbotSettings.Enabled then
+        local keyState = false
+        if Options.AimbotKey then
+             if Options.AimbotKey.GetState then keyState = Options.AimbotKey:GetState()
+             else
+                local keyName = Options.AimbotKey.Value
+                if keyName then
+                    if keyName:find("MouseButton1") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                    elseif keyName:find("MouseButton2") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+                    else
+                        local success, keyCode = pcall(function() return Enum.KeyCode[keyName] end)
+                        if success and keyCode then keyState = UserInputService:IsKeyDown(keyCode) end
+                    end
+                end
+             end
+        end
+
+        if keyState then
+             local target = nil
+             
+             -- Sticky Aim
+             if AimbotSettings.StickyAim and AimbotSettings.Target then
+                local sticky = AimbotSettings.Target
+                if sticky and sticky.Parent and sticky.Parent:FindFirstChild("Humanoid") and sticky.Parent.Humanoid.Health > 0 then
+                     local visible = true
+                     if AimbotSettings.VisibleCheck then visible = IsVisible(sticky, {LocalPlayer.Character, Camera}) end
+                     local sPos, sOn = Camera:WorldToViewportPoint(sticky.Position)
+                     local mousePos = UserInputService:GetMouseLocation()
+                     if sOn and (Vector2.new(sPos.X, sPos.Y) - mousePos).Magnitude > AimbotSettings.FOV * 1.5 then visible = false end
+                     if visible then target = sticky end
+                end
              end
              
-             -- Also check FOV for sticky? usually sticky aim ignores FOV once locked, or has larger FOV.
-             -- Let's check strict FOV to allow switching if they leave screen
-             local sPos, sOn = Camera:WorldToViewportPoint(sticky.Position)
-             local mousePos = UserInputService:GetMouseLocation()
-             if sOn and (Vector2.new(sPos.X, sPos.Y) - mousePos).Magnitude > AimbotSettings.FOV * 1.5 then
-                 visible = false -- Lost due to distance
+             if not target then
+                 target = GetBestAimTarget()
              end
              
-             if visible then target = sticky end
-        end
-    end
-    
-    if not target then
-        target = GetBestAimTarget()
-    end
-    
-    -- Reaction Delay & Target Switch
-    if target ~= AimbotSettings.Target then
-        if AimbotSettings.Target == nil then
-             AimbotSettings.LastTargetTime = tick() 
-        end
-        AimbotSettings.Target = target
-        
-        -- Generate Curve Offset (Perpendicular Vector)
-        if target then
-            local toTarget = (target.Position - Camera.CFrame.Position).Unit
-            local randomAxis = Vector3.new(math.random()-0.5, math.random()-0.5, math.random()-0.5).Unit
-            local perpendicular = toTarget:Cross(randomAxis).Unit
-            AimbotSettings.CurveOffset = perpendicular * (AimbotSettings.CurveAmount * 2) 
-        end
-        
-        AimbotSettings.RandomSeed = math.random(1, 1000)
-    end
-    
-    if target and target.Parent and target.Parent:FindFirstChild("Humanoid") and target.Parent.Humanoid.Health > 0 then
-        if tick() - AimbotSettings.LastTargetTime < AimbotSettings.ReactionDelay then return end
-    
-        local currentCFrame = Camera.CFrame
-        local goalPosition = target.Position
-        
-        -- Apply Prediction
-        if AimbotSettings.Prediction then
-             local velocity = target.AssemblyLinearVelocity or target.Velocity or Vector3.zero
-             -- Determine 'time to hit' based on distance? Or just simple scalar
-             -- Simple scalar is usually better for universal inputs
-             -- E.g. Target move direction * scalar
-             goalPosition = goalPosition + (velocity * (AimbotSettings.PredictionAmount / 15)) -- Slider 3 ~= 0.2s prediction
-        end
-        
-        -- Apply Deadzone
-        local screenPos, onScreen = Camera:WorldToViewportPoint(goalPosition)
-        if onScreen then
-            local mousePos = UserInputService:GetMouseLocation()
-            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-            if dist < AimbotSettings.Deadzone then return end
-        end
-        
-        -- Decay Curve Offset
-        if AimbotSettings.CurveOffset.Magnitude > 0.05 then
-            AimbotSettings.CurveOffset = AimbotSettings.CurveOffset:Lerp(Vector3.zero, dt * (10 - AimbotSettings.CurveAmount))
-            goalPosition = goalPosition + AimbotSettings.CurveOffset
-        end
-        
-        -- Apply Tremor/Shake (Perlin Noise-ish)
-        if AimbotSettings.ShakeAmount > 0 then
-            local time = tick() * 10
-            local noiseX = (math.sin(time) + math.sin(time * 2.5)) / 2
-            local noiseY = (math.cos(time) + math.cos(time * 2.3)) / 2
-            local tremor = Vector3.new(noiseX, noiseY, 0) * (AimbotSettings.ShakeAmount / 50)
-            goalPosition = goalPosition + tremor
-        end
-        
-        -- Calculate Look
-        local goalRotation = CFrame.new(currentCFrame.Position, goalPosition)
-        
-        -- Apply Smoothing Style
-        local style = AimbotSettings.AimStyle
-        local alpha = 1
-        
-        if style == "Mouse" then
-            -- "Human-Like" Variable Speed
-            -- Far = Fast, Close = Slow
-            local angle = math.acos(math.clamp(currentCFrame.LookVector:Dot((goalPosition - currentCFrame.Position).Unit), -1, 1))
-            local distFactor = math.deg(angle) -- Degrees off target
-            
-            -- Speed curve: Fast start, slow finish
-            local speedVar = math.clamp(distFactor / 5, 0.1, 5) 
-            
-            local smoothVal = AimbotSettings.Smoothing
-            alpha = math.clamp((speedVar / smoothVal) * dt * 60, 0.001, 0.8)
-            Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha)
-            
-        elseif style == "Spring" then
-            local smoothFactor = 1 / (AimbotSettings.Smoothing * 0.5)
-            alpha = math.clamp(smoothFactor * dt * 10, 0.01, 1)
-            Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha)
-            
-        elseif style == "Linear" then
-            alpha = math.clamp((100 - AimbotSettings.Smoothing) / 100 * dt * 10, 0.01, 1)
-            Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha)
+             -- Update Target & Curve Logic
+             if target ~= AimbotSettings.Target then
+                 if AimbotSettings.Target == nil then AimbotSettings.LastTargetTime = tick() end
+                 AimbotSettings.Target = target
+                 if target then
+                    local toTarget = (target.Position - Camera.CFrame.Position).Unit
+                    local randomAxis = Vector3.new(math.random()-0.5, math.random()-0.5, math.random()-0.5).Unit
+                    local perpendicular = toTarget:Cross(randomAxis).Unit
+                    AimbotSettings.CurveOffset = perpendicular * (AimbotSettings.CurveAmount * 2) 
+                 end
+                 AimbotSettings.RandomSeed = math.random(1, 1000)
+             end
+             
+             -- Application
+             if target and target.Parent and target.Parent:FindFirstChild("Humanoid") and target.Parent.Humanoid.Health > 0 then
+                 if tick() - AimbotSettings.LastTargetTime >= AimbotSettings.ReactionDelay then
+
+                     local goalPosition = target.Position
+                     
+                     -- Prediction
+                     if AimbotSettings.Prediction then
+                          local velocity = target.AssemblyLinearVelocity or target.Velocity or Vector3.zero
+                          goalPosition = goalPosition + (velocity * (AimbotSettings.PredictionAmount / 15)) 
+                     end
+                     
+                     -- Convert to Screen Position for Mouse Mover
+                     local sPos, sOn = Camera:WorldToViewportPoint(goalPosition)
+                     if sOn then
+                         local mousePos = UserInputService:GetMouseLocation()
+                         local dist = (Vector2.new(sPos.X, sPos.Y) - mousePos).Magnitude
+                         
+                         if dist >= AimbotSettings.Deadzone then
+                              -- Curve
+                              if AimbotSettings.CurveOffset.Magnitude > 0.05 then
+                                  AimbotSettings.CurveOffset = AimbotSettings.CurveOffset:Lerp(Vector3.zero, dt * (10 - AimbotSettings.CurveAmount))
+                                  -- curve affects screen position? Hard to map 3D curve to mouse delta accurately.
+                              end
+
+                              -- Shake
+                              local shakeOffset = Vector2.zero
+                              if AimbotSettings.ShakeAmount > 0 then
+                                  local time = tick() * 10
+                                  shakeOffset = Vector2.new(math.sin(time), math.cos(time)) * (AimbotSettings.ShakeAmount / 5)
+                              end
+                              
+                              -- Calculate Delta
+                              local targetScreen = Vector2.new(sPos.X, sPos.Y)
+                              local delta = (targetScreen - mousePos) + shakeOffset
+                              
+                              -- Smoothing
+                              local smooth = AimbotSettings.Smoothing
+                              if smooth < 1 then smooth = 1 end
+                              
+                              delta = delta / smooth
+                              
+                              -- Move Mouse
+                              if mousemoverel then
+                                  mousemoverel(delta.X, delta.Y)
+                              else
+                                  -- Fallback
+                              end
+                         end
+                     end
+                 end
+             end
+        else
+            AimbotSettings.Target = nil
+            AimbotSettings.CurveOffset = Vector3.zero
         end
     else
         AimbotSettings.Target = nil
+    end
+
+    ---------------------------
+    -- 2. TriggerBot Logic
+    ---------------------------
+    if TriggerBotSettings.Enabled then
+        local keyState = false
+        if Options.TriggerBotKey then
+             if Options.TriggerBotKey.GetState then keyState = Options.TriggerBotKey:GetState()
+             else
+                local keyName = Options.TriggerBotKey.Value
+                if keyName then
+                    if keyName:find("MouseButton1") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                    elseif keyName:find("MouseButton2") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+                    else
+                        local success, keyCode = pcall(function() return Enum.KeyCode[keyName] end)
+                        if success and keyCode then keyState = UserInputService:IsKeyDown(keyCode) end
+                    end
+                end
+             end
+        end
+
+        if keyState then
+            -- Raycast Center
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            local result = workspace:Raycast(Camera.CFrame.Position, Camera.CFrame.LookVector * 1000, rayParams)
+            
+            if result and result.Instance and result.Instance.Parent then
+                local model = result.Instance:FindFirstAncestorOfClass("Model")
+                if model then
+                    local plr = game:GetService("Players"):GetPlayerFromCharacter(model)
+                    if plr and plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+                        local isTeammate = (TriggerBotSettings.TeamCheck and plr.Team == LocalPlayer.Team)
+                        if not isTeammate then
+                             -- Fire
+                             if tick() - (TriggerBotSettings.LastFire or 0) > TriggerBotSettings.Delay then
+                                 TriggerBotSettings.LastFire = tick()
+                                 if mouse1click then mouse1click()
+                                 elseif vim then 
+                                     vim:SendMouseButtonEvent(0,0,0,true,game,0)
+                                     task.delay(0.05, function() vim:SendMouseButtonEvent(0,0,0,false,game,0) end)
+                                 end
+                             end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    ---------------------------
+    -- 3. Silent Auto Fire
+    ---------------------------
+    if SilentSettings.Enabled and SilentSettings.AutoFire then
+         -- Simplest: Reuse Logic
+         local t, v = GetClosestTarget()
+         if t then
+             if tick() - (SilentSettings.LastAutoFire or 0) > 0.1 then
+                 SilentSettings.LastAutoFire = tick()
+                 if mouse1click then mouse1click() end
+             end
+         end
     end
 end)
 
