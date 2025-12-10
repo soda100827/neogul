@@ -3428,7 +3428,7 @@ function library:init()
                         tooltip(button);
                         button:SetText(button.text);
                         self:UpdateOptions();
-                        return button
+                        return self
                     end
                     ----------------------
 
