@@ -400,6 +400,32 @@ task.spawn(function()
     print("Unlock All Loaded")
 end)
 
+local SpamMessage = Misc:AddToggle("SpamMessage", {Title = "Spam Message", Default = false })
+
+-- Auto Chat Spam Logic
+task.spawn(function()
+    local messages = {
+        "하수구",
+        "쪼준",
+        "쪼준CEO",
+        "쪼준컴퍼니 입사함"
+    }
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local DefaultChatSystemChatEvents = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents", 5)
+    local SayMessageRequest = DefaultChatSystemChatEvents and DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
+    
+    while true do
+        task.wait(1)
+        if Options.SpamMessage and Options.SpamMessage.Value then
+            local msg = messages[math.random(1, #messages)]
+            
+            if SayMessageRequest then
+                SayMessageRequest:FireServer(msg, "All")
+            end
+        end
+    end
+end)
+
 local AutoLoad = Misc:AddToggle("AutoLoad", {Title = "Auto Load Script", Default = false })
 AutoLoad:OnChanged(function()
     if Options.AutoLoad.Value then
