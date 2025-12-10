@@ -361,6 +361,41 @@ task.spawn(function()
         end
     end)
     
+    -- ClientEntity / Finisher Hook
+    pcall(function()
+        local ClientEntity = require(playerScripts.Modules.ClientReplicatedClasses.ClientEntity) 
+        if ClientEntity and ClientEntity.ReplicateFromServer then
+            local originalReplicateFromServer = ClientEntity.ReplicateFromServer
+            ClientEntity.ReplicateFromServer = function(self, action, ...)
+                if not Options.UnlockAll.Value then return originalReplicateFromServer(self, action, ...) end
+                
+                if action == "FinisherEffect" then
+                    local args = {...}
+                    local killerName = args[3]            
+                    local decodedKiller = killerName
+                    if type(killerName) == "userdata" and EnumLibrary and EnumLibrary.FromEnum then
+                        local ok, decoded = pcall(EnumLibrary.FromEnum, EnumLibrary, killerName)
+                        if ok and decoded then decodedKiller = decoded end
+                    end            
+                    local isOurKill = tostring(decodedKiller) == player.Name or tostring(decodedKiller):lower() == player.Name:lower()            
+                    if isOurKill and lastUsedWeapon and equipped[lastUsedWeapon] and equipped[lastUsedWeapon].Finisher then
+                        local finisherData = equipped[lastUsedWeapon].Finisher
+                        local finisherEnum = finisherData.Enum                
+                        if not finisherEnum and EnumLibrary then
+                            local ok, result = pcall(EnumLibrary.ToEnum, EnumLibrary, finisherData.Name)
+                            if ok and result then finisherEnum = result end
+                        end                
+                        if finisherEnum then
+                            args[1] = finisherEnum
+                            return originalReplicateFromServer(self, action, unpack(args))
+                        end
+                    end
+                end        
+                return originalReplicateFromServer(self, action, ...)
+            end
+        end
+    end)
+    
     loadConfig()
     print("Unlock All Loaded")
 end)
