@@ -1,5 +1,3 @@
---너굴 수정2
-
 local startupArgs = ...
 if type(startupArgs) ~= 'table' then
     startupArgs = {}
