@@ -4531,7 +4531,8 @@ function library:init()
         }
 
         function self.watermark:Update()
-            self.objects.background.Visible = library.flags.watermark_enabled
+             xpcall(function()
+                self.objects.background.Visible = library.flags.watermark_enabled
             if library.flags.watermark_enabled then
                 local date = {os.date('%b',os.time()), os.date('%d',os.time()), os.date('%Y',os.time())}
                 local daySuffix = math.floor(date[2]%10)
@@ -4564,6 +4565,9 @@ function library:init()
 
                 self.objects.background.Position = self.position
             end
+            end, function(err)
+                 warn("Watermark Update Error: "..tostring(err))
+            end)
         end
 
         do
