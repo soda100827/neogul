@@ -4527,9 +4527,7 @@ function library:init()
         self.watermark = {
             objects = {};
             text = {
-                {"informant.wtf", true},
-                {"V"..getgenv().Config.Version, true},
-                {getgenv().luaguardvars.DiscordName, true},
+                {"NeoGul", true},
                 {'0 fps', true},
                 {'0ms', true},
             };
@@ -4545,8 +4543,8 @@ function library:init()
                 local daySuffix = math.floor(date[2]%10)
                 date[2] = date[2]..(daySuffix == 1 and 'st' or daySuffix == 2 and 'nd' or daySuffix == 3 and 'rd' or 'th')
 
-                self.text[4][1] = library.stats.fps..' fps'
-                self.text[5][1] = floor(library.stats.ping)..'ms'
+                self.text[2][1] = library.stats.fps..' fps'
+                self.text[3][1] = floor(library.stats.ping)..'ms'
 
                 local text = {};
                 for _,v in next, self.text do
