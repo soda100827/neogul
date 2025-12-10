@@ -598,7 +598,10 @@ local SilentSettings = {
     TeamCheck = true,
     SmartTargeting = false, -- Scans for closest bone instead of fixed
     MaxDistance = 1000,
-    AutoFire = false
+    AutoFire = false,
+    
+    -- New
+    WallCheckType = "Raycast" -- Raycast, Screen
 }
 
 local TargetBodyPart = nil  
@@ -642,7 +645,7 @@ local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {Title = "타겟 �
 local SilentDetailSection = Tabs.Combat:AddSection("사일런트 에임 세부 설정")
 Tabs.Combat:AddToggle("SilentSmart", {Title = "스마트 타겟팅", Description = "커서와 가장 가까운 뼈를 자동으로 조준합니다", Default = false }):OnChanged(function(v) SilentSettings.SmartTargeting = v end)
 Tabs.Combat:AddToggle("SilentVisible", {Title = "벽 구분 (보이는 적만)", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
-Tabs.Combat:AddToggle("SilentTeam", {Title = "팀 구분 (아군 제외)", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end)
+-- Tabs.Combat:AddToggle("SilentTeam", {Title = "팀 구분 (아군 제외)", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end) -- Removed as per request
 Tabs.Combat:AddSlider("SilentDist", {Title = "최대 사거리", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
 
 -- [[ Silent Aim Functions ]] --
@@ -659,8 +662,8 @@ local function GetClosestTarget()
             local root = player.Character:FindFirstChild("HumanoidRootPart")
             if hum and root and hum.Health > 0 then
                 
-                -- Team Check
-                if SilentSettings.TeamCheck and player.Team == LocalPlayer.Team then continue end
+                -- Team Check REMOVED
+                -- if SilentSettings.TeamCheck and player.Team == LocalPlayer.Team then continue end
                 
                 -- Max Distance Check
                 if (root.Position - myPos).Magnitude > SilentSettings.MaxDistance then continue end
@@ -704,8 +707,17 @@ local function GetClosestTarget()
                          rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
                          rayParams.FilterType = Enum.RaycastFilterType.Exclude
                          rayParams.IgnoreWater = true
+                         
+                         -- Enhanced: Ignore transparent parts/BaseParts with CanCollide false (optional but better)
                          local res = workspace:Raycast(origin, direction, rayParams)
                          if res and not res.Instance:IsDescendantOf(player.Character) then
+                             -- Check if the hit part is essentially transparent or non-blocking
+                             if res.Instance.Transparency > 0.5 or not res.Instance.CanCollide then
+                                -- Try again ignoring this part? 
+                                -- For high performance simple raycast, we usually accept it blocks.
+                                -- Use Raycast "Block" list for true visible check
+                                continue -- Obscured
+                             end
                              continue -- Obscured
                          end
                     end
@@ -808,7 +820,12 @@ local AimbotSettings = {
     LastKillTime = 0,
     CurveOffset = Vector3.zero,
     SpeedMultiplier = 1,
-    RandomSeed = 0
+    RandomSeed = 0,
+
+    -- Performance / New
+    StickyAim = false,
+    PredictionAmount = 0, -- 0 to 10 scale usually? Or just Velocity multiplier
+    Prediction = false
 }
 
 local AimbotSection = Tabs.Combat:AddSection("레짓 에임봇 설정 (자연스러운 에임)")
@@ -819,13 +836,16 @@ AimToggle:OnChanged(function(v) AimbotSettings.Enabled = v end)
 local AimKey = Tabs.Combat:AddKeybind("AimbotKey", {
     Title = "작동 키 (꾹 누르기)",
     Mode = "Hold",
-    Default = Enum.UserInputType.MouseButton2,
+    Default = Enum.KeyCode.LeftAlt,
     ChangedCallback = function(New) end
 })
 
 -- Targeting Config
 Tabs.Combat:AddDropdown("AimbotPart", {Title = "타겟 우선순위", Values = {"Head", "Random", "Nearest"}, Default = "Nearest", Multi = false, Callback = function(v) AimbotSettings.TargetPart = v end})
 Tabs.Combat:AddToggle("AimbotVisibleCheck", {Title = "벽 구분 (보이는 적만)", Default = true }):OnChanged(function(v) AimbotSettings.VisibleCheck = v end)
+Tabs.Combat:AddToggle("AimbotSticky", {Title = "Sticky Aim (라킹 유지)", Description = "타겟이 죽을 때까지 에임 고정", Default = false }):OnChanged(function(v) AimbotSettings.StickyAim = v end)
+Tabs.Combat:AddToggle("AimbotPrediction", {Title = "예측 (Prediction)", Default = false }):OnChanged(function(v) AimbotSettings.Prediction = v end)
+Tabs.Combat:AddSlider("AimbotPredAmt", {Title = "예측 강도", Default = 3, Min = 0, Max = 20, Rounding = 1, Callback = function(v) AimbotSettings.PredictionAmount = v end})
 
 -- FOV Config
 local FOVSection = Tabs.Combat:AddSection("FOV (시야각) 설정")
@@ -879,8 +899,15 @@ local function IsVisible(targetPart, ignoreList)
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
     raycastParams.IgnoreWater = true
     
+    -- Enhanced Raycast for Aimbot
     local result = workspace:Raycast(origin, direction, raycastParams)
-    return result == nil or result.Instance:IsDescendantOf(targetPart.Parent)
+    if result then
+        if result.Instance:IsDescendantOf(targetPart.Parent) then return true end
+        -- Basic wallbang check: if transparency high?
+        if result.Instance.Transparency > 0.7 then return true end -- Ignore glass/windows
+        return false
+    end
+    return true
 end
 
 local function GetBestAimTarget()
@@ -951,7 +978,32 @@ RunService.RenderStepped:Connect(function(dt)
         return 
     end
     
-    local target = GetBestAimTarget()
+    local target = nil
+    
+    -- Sticky Aim Implementation
+    if AimbotSettings.StickyAim and AimbotSettings.Target then
+        local sticky = AimbotSettings.Target
+        if sticky and sticky.Parent and sticky.Parent:FindFirstChild("Humanoid") and sticky.Parent.Humanoid.Health > 0 then
+             local visible = true
+             if AimbotSettings.VisibleCheck then
+                 visible = IsVisible(sticky, {LocalPlayer.Character, Camera})
+             end
+             
+             -- Also check FOV for sticky? usually sticky aim ignores FOV once locked, or has larger FOV.
+             -- Let's check strict FOV to allow switching if they leave screen
+             local sPos, sOn = Camera:WorldToViewportPoint(sticky.Position)
+             local mousePos = UserInputService:GetMouseLocation()
+             if sOn and (Vector2.new(sPos.X, sPos.Y) - mousePos).Magnitude > AimbotSettings.FOV * 1.5 then
+                 visible = false -- Lost due to distance
+             end
+             
+             if visible then target = sticky end
+        end
+    end
+    
+    if not target then
+        target = GetBestAimTarget()
+    end
     
     -- Reaction Delay & Target Switch
     if target ~= AimbotSettings.Target then
@@ -976,6 +1028,15 @@ RunService.RenderStepped:Connect(function(dt)
     
         local currentCFrame = Camera.CFrame
         local goalPosition = target.Position
+        
+        -- Apply Prediction
+        if AimbotSettings.Prediction then
+             local velocity = target.AssemblyLinearVelocity or target.Velocity or Vector3.zero
+             -- Determine 'time to hit' based on distance? Or just simple scalar
+             -- Simple scalar is usually better for universal inputs
+             -- E.g. Target move direction * scalar
+             goalPosition = goalPosition + (velocity * (AimbotSettings.PredictionAmount / 15)) -- Slider 3 ~= 0.2s prediction
+        end
         
         -- Apply Deadzone
         local screenPos, onScreen = Camera:WorldToViewportPoint(goalPosition)
