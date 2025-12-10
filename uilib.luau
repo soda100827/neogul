@@ -2083,9 +2083,11 @@ function library:init()
 
                     table.insert(self.options, toggle)
 
+                    local shouldCallback = false 
                     if toggle.flag then
                         if library.flags[toggle.flag] ~= nil then
                             toggle.state = library.flags[toggle.flag]
+                            shouldCallback = true
                         end
                         library.flags[toggle.flag] = toggle.state;
                         library.options[toggle.flag] = toggle;
@@ -2235,9 +2237,11 @@ function library:init()
                         
                         table.insert(self.options, color)
     
+                        local shouldCallback = false
                         if color.flag then
                             if library.flags[color.flag] ~= nil then
                                 color.color = library.flags[color.flag]
+                                shouldCallback = true
                             end
                             library.flags[color.flag] = color.color;
                             library.options[color.flag] = color;
@@ -2351,8 +2355,8 @@ function library:init()
                         end
     
                         tooltip(color);
-                        color:SetColor(color.color, true);
-                        color:SetTrans(color.trans, true);
+                        color:SetColor(color.color, not shouldCallback);
+                        color:SetTrans(color.trans, not shouldCallback);
                         self:UpdateOptions();
                         return color
                     end
@@ -2387,9 +2391,11 @@ function library:init()
                         
                         table.insert(self.options, bind)
     
+                        local shouldCallback = false
                         if bind.flag then
                             if library.flags[bind.flag] ~= nil then
                                 bind.state = library.flags[bind.flag]
+                                shouldCallback = true
                             end
                             library.options[bind.flag] = bind;
                         end
@@ -2548,6 +2554,7 @@ function library:init()
     
                         tooltip(bind);
                         bind:SetBind(bind.bind);
+                        if shouldCallback then bind.callback(bind.state) end
                         self:UpdateOptions();
                         return bind
                     end
@@ -2579,9 +2586,11 @@ function library:init()
                 
                         table.insert(self.options, slider)
 
+                        local shouldCallback = false
                         if slider.flag then
                             if library.flags[slider.flag] ~= nil then
                                 slider.value = library.flags[slider.flag]
+                                shouldCallback = true
                             end
                             library.flags[slider.flag] = slider.value;
                             library.options[slider.flag] = slider;
@@ -2730,7 +2739,7 @@ function library:init()
                         end
 
                         tooltip(slider);
-                        slider:SetValue(slider.value, true);
+                        slider:SetValue(slider.value, not shouldCallback);
                         self:UpdateOptions();
                         return slider
                     end
@@ -2760,9 +2769,11 @@ function library:init()
                             end
                         end
     
+                        local shouldCallback = false
                         if list.flag then
                             if library.flags[list.flag] ~= nil then
                                 list.selected = library.flags[list.flag]
+                                shouldCallback = true
                             end
                             library.flags[list.flag] = list.selected;
                             library.options[list.flag] = list;
@@ -2917,14 +2928,14 @@ function library:init()
                         end
     
                         tooltip(list);
-                        list:Select((data.value or data.selected) or (list.multi and 'none' or list.values[1]), true);
+                        list:Select((data.value or data.selected) or (list.multi and 'none' or list.values[1]), not shouldCallback);
                         self:UpdateOptions();
                         return list
                     end
 
                     tooltip(toggle);
                     toggle:SetText(toggle.text);
-                    toggle:SetState(toggle.state, true);
+                    toggle:SetState(toggle.state, not shouldCallback);
                     self:UpdateOptions();
                     return toggle
                 end
@@ -2959,9 +2970,11 @@ function library:init()
                     
                     table.insert(self.options, slider)
 
+                    local shouldCallback = false
                     if slider.flag then
                         if library.flags[slider.flag] ~= nil then
                             slider.value = library.flags[slider.flag]
+                            shouldCallback = true
                         end
                         library.flags[slider.flag] = slider.value;
                         library.options[slider.flag] = slider;
@@ -3169,7 +3182,7 @@ function library:init()
 
                     tooltip(slider);
                     slider:SetText(slider.text);
-                    slider:SetValue(slider.value, true);
+                    slider:SetValue(slider.value, not shouldCallback);
                     self:UpdateOptions();
                     return slider
                 end
@@ -3604,9 +3617,11 @@ function library:init()
                     
                     table.insert(self.options, color)
 
+                    local shouldCallback = false
                     if color.flag then
                         if library.flags[color.flag] ~= nil then
                             color.color = library.flags[color.flag]
+                            shouldCallback = true
                         end
                         library.flags[color.flag] = color.color;
                         library.options[color.flag] = color;
@@ -3737,8 +3752,8 @@ function library:init()
 
                     tooltip(color);
                     color:SetText(color.text);
-                    color:SetColor(color.color, true);
-                    color:SetTrans(color.trans, true);
+                    color:SetColor(color.color, not shouldCallback);
+                    color:SetTrans(color.trans, not shouldCallback);
                     self:UpdateOptions();
                     return color
                 end
@@ -3767,9 +3782,11 @@ function library:init()
                     
                     table.insert(self.options, box)
 
+                    local shouldCallback = false
                     if box.flag then
                         if library.flags[box.flag] ~= nil then
                             box.input = library.flags[box.flag]
+                            shouldCallback = true
                         end
                         library.flags[box.flag] = box.input;
                         library.options[box.flag] = box;
@@ -3963,7 +3980,7 @@ function library:init()
 
                     tooltip(box);
                     box:SetText(box.text);
-                    box:SetInput(box.input, true);
+                    box:SetInput(box.input, not shouldCallback);
                     self:UpdateOptions();
                     return box
                 end
@@ -3978,8 +3995,8 @@ function library:init()
                         bind = 'none';
                         mode = 'toggle';
                         order = #self.options+1;
-                        callback = function() end;
-                        keycallback = function() end;
+                        callback = data.callback or data.keycallback or function() end;
+                        keycallback = data.keycallback or function() end;
                         indicatorValue = library.keyIndicator:AddValue({value = 'value', key = 'key', enabled = false});
                         noindicator = false;
                         state = false;
@@ -3999,9 +4016,11 @@ function library:init()
                     
                     table.insert(self.options, bind)
 
+                    local shouldCallback = false
                     if bind.flag then
                         if library.flags[bind.flag] ~= nil then
                             bind.state = library.flags[bind.flag]
+                            shouldCallback = true
                         end
                         library.options[bind.flag] = bind;
                     end
@@ -4139,6 +4158,7 @@ function library:init()
 
                     tooltip(bind);
                     bind:SetBind(bind.bind);
+                    if shouldCallback then bind.callback(bind.state) end
                     bind:SetText(bind.text);
                     self:UpdateOptions();
                     return bind

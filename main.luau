@@ -3,7 +3,7 @@ getgenv().Config = {
 	Version = "0.0",
 }
 
-local library = loadstring(readfile("rivals_neogul/uilib.luau"))()
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/soda100827/neogul/refs/heads/main/uilib.luau"))()
 
 library:init() -- Initalizes Library Do Not Delete This
 
