@@ -33,21 +33,8 @@ local Tabs = {
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
-local SilentFile = "Rivals_SilentMode.txt"
-local IsSilent = isfile and isfile(SilentFile) and readfile(SilentFile) == "true"
-
 local Options = Fluent.Options
 local Misc = Tabs.Misc
-
-local SilentModeToggle = Misc:AddToggle("SilentMode", {Title = "Silent Mode (Start Hidden)", Default = IsSilent })
-SilentModeToggle:OnChanged(function(v) 
-    if writefile then writefile(SilentFile, tostring(v)) end 
-end)
-
-if IsSilent then 
-    Window:Minimize() 
-end
-
 
 local UnlockAll = Misc:AddToggle("UnlockAll", {Title = "Unlock All Cosmetics", Default = false })
 
@@ -753,6 +740,291 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         end
     end
     return oldNamecall(self, ...)
+end)
+
+-- [[ Legit Aimbot Logic ]] --
+local AimbotSettings = {
+    Enabled = false,
+    Keybind = "RMS", 
+    VisibleCheck = true,
+    TeamCheck = true,
+    TargetPart = "Nearest", 
+    
+    -- FOV
+    FOV = 100,
+    DynamicFOV = false,
+    ShowFOV = false,
+    
+    -- Advanced Styling
+    AimStyle = "Spring", -- Spring, Linear, Sine, Back, Elastic
+    Smoothing = 15, -- For Spring (Higher = Slower)
+    AssistStrength = 100, -- % (For non-spring styles, 100% = lock, 1% = slow drift)
+    
+    -- Humanization
+    ReactionDelay = 0.15,
+    Jitter = 0,
+    Overshoot = 0,
+    Deadzone = 0, -- Pixels (Don't aim if close)
+    TargetSwitchDelay = 0,
+    
+    -- Recoil Control
+    RCS = false,
+    RCSStrength = 50,
+    
+    -- Internal
+    Target = nil,
+    LastTargetTime = 0,
+    LastKillTime = 0, -- For switch delay
+    OvershootOffset = Vector3.zero 
+}
+
+local AimbotSection = Tabs.Combat:AddSection("Legit Aimbot Config")
+
+local AimToggle = Tabs.Combat:AddToggle("AimbotEnabled", {Title = "Aimbot Enabled", Default = false })
+AimToggle:OnChanged(function(v) AimbotSettings.Enabled = v end)
+
+local AimKey = Tabs.Combat:AddKeybind("AimbotKey", {
+    Title = "Trigger Key",
+    Mode = "Hold",
+    Default = "RightMouseButton",
+    ChangedCallback = function(New) end
+})
+
+Tabs.Combat:AddDropdown("AimbotPart", {Title = "Target Priority", Values = {"Head", "Random", "Nearest"}, Default = "Nearest", Multi = false, Callback = function(v) AimbotSettings.TargetPart = v end})
+Tabs.Combat:AddToggle("AimbotVisibleCheck", {Title = "Visible Check", Default = true }):OnChanged(function(v) AimbotSettings.VisibleCheck = v end)
+
+-- FOV Section
+local FOVSection = Tabs.Combat:AddSection("Field of View")
+Tabs.Combat:AddSlider("AimbotFOV", {Title = "FOV Radius", Default = 100, Min = 10, Max = 800, Rounding = 0, Callback = function(v) AimbotSettings.FOV = v end})
+Tabs.Combat:AddToggle("AimbotDynamicFOV", {Title = "Dynamic FOV", Description = "Adjusts FOV based on Enemy Distance", Default = false }):OnChanged(function(v) AimbotSettings.DynamicFOV = v end)
+
+-- Styles & Humanization Section
+local StyleSection = Tabs.Combat:AddSection("Aim Styles & Humanization")
+
+Tabs.Combat:AddDropdown("AimStyle", {
+    Title = "Aim Style",
+    Values = {"Spring", "Linear", "Sine EaseOut", "Back EaseOut", "Elastic"},
+    Default = "Spring",
+    Multi = false,
+    Callback = function(v) AimbotSettings.AimStyle = v end
+})
+
+Tabs.Combat:AddSlider("AimbotSmooth", {Title = "Spring / Smoothness", Description = "Spring: Stiffness | Others: Speed", Default = 15, Min = 1, Max = 100, Rounding = 1, Callback = function(v) AimbotSettings.Smoothing = v end})
+
+Tabs.Combat:AddSlider("AimbotReaction", {Title = "Reaction Delay", Default = 0.15, Min = 0, Max = 0.5, Rounding = 2, Callback = function(v) AimbotSettings.ReactionDelay = v end})
+Tabs.Combat:AddSlider("TargetSwitchDelay", {Title = "Target Switch Delay", Default = 0, Min = 0, Max = 1, Rounding = 2, Callback = function(v) AimbotSettings.TargetSwitchDelay = v end})
+Tabs.Combat:AddSlider("AimbotDeadzone", {Title = "Deadzone (px)", Description = "Stop aiming if crosshair is this close", Default = 2, Min = 0, Max = 30, Rounding = 0, Callback = function(v) AimbotSettings.Deadzone = v end})
+
+Tabs.Combat:AddSlider("AimbotJitter", {Title = "Jitter Intensity", Default = 0, Min = 0, Max = 20, Rounding = 1, Callback = function(v) AimbotSettings.Jitter = v end})
+Tabs.Combat:AddSlider("AimbotOvershoot", {Title = "Overshoot Amount", Default = 0, Min = 0, Max = 20, Rounding = 1, Callback = function(v) AimbotSettings.Overshoot = v end})
+
+
+-- [[ Spring Module (Internal) ]] --
+local Spring = {}
+Spring.__index = Spring
+
+function Spring.new(mass, force, damping, speed)
+    local self = setmetatable({}, Spring)
+    self.Target = Vector3.zero
+    self.Position = Vector3.zero
+    self.Velocity = Vector3.zero
+    self.Mass = mass
+    self.Force = force
+    self.Damping = damping
+    self.Speed = speed
+    return self
+end
+
+function Spring:Update(dt)
+    local scaledDt = dt * self.Speed
+    local acceleration = (self.Target - self.Position) * self.Force / self.Mass
+    acceleration = acceleration - self.Velocity * self.Damping
+    self.Velocity = self.Velocity + acceleration * scaledDt
+    self.Position = self.Position + self.Velocity * scaledDt
+    return self.Position
+end
+
+local AimSpring = Spring.new(5, 50, 4, 4) 
+
+-- Helper: Visibility Check
+local function IsVisible(targetPart, ignoreList)
+    local origin = Camera.CFrame.Position
+    local direction = targetPart.Position - origin
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = ignoreList or {LocalPlayer.Character, Camera}
+    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+    raycastParams.IgnoreWater = true
+    
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return result == nil or result.Instance:IsDescendantOf(targetPart.Parent)
+end
+
+-- Helper: Get Best Aimbot Target
+local function GetBestAimTarget()
+    local bestTarget = nil
+    local bestScore = math.huge 
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if root and hum and hum.Health > 0 then
+                if AimbotSettings.TeamCheck and p.Team == LocalPlayer.Team then continue end
+                
+                local targetPartObj
+                if AimbotSettings.TargetPart == "Head" then targetPartObj = p.Character:FindFirstChild("Head")
+                elseif AimbotSettings.TargetPart == "Random" then 
+                    local parts = {"Head", "UpperTorso", "LowerTorso"}
+                    targetPartObj = p.Character:FindFirstChild(parts[math.random(1, #parts)])
+                else -- Nearest
+                    local head = p.Character:FindFirstChild("Head")
+                    local torso = p.Character:FindFirstChild("UpperTorso")
+                    
+                    if head and torso then
+                        local hPos, hOn = Camera:WorldToViewportPoint(head.Position)
+                        local tPos, tOn = Camera:WorldToViewportPoint(torso.Position)
+                        local hDist = hOn and (Vector2.new(hPos.X, hPos.Y) - mousePos).Magnitude or math.huge
+                        local tDist = tOn and (Vector2.new(tPos.X, tPos.Y) - mousePos).Magnitude or math.huge
+                        targetPartObj = (hDist < tDist) and head or torso
+                    elseif head then targetPartObj = head
+                    elseif torso then targetPartObj = torso
+                    end
+                end
+                
+                if targetPartObj then
+                    if AimbotSettings.VisibleCheck and not IsVisible(targetPartObj, {LocalPlayer.Character, Camera}) then continue end
+                    
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(targetPartObj.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                        
+                        -- Dynamic FOV Adjustment
+                        local maxFov = AimbotSettings.FOV
+                        if AimbotSettings.DynamicFOV then
+                             local distToPlayer = (targetPartObj.Position - Camera.CFrame.Position).Magnitude
+                             -- Smaller FOV for distant players to prevent snapping to randoms
+                             maxFov = maxFov * (100 / math.max(10, distToPlayer)) 
+                        end
+                        
+                        if dist < maxFov and dist < bestScore then
+                            bestScore = dist
+                            bestTarget = targetPartObj
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return bestTarget
+end
+
+-- Calculation & Application Loop
+RunService.RenderStepped:Connect(function(dt)
+    if not AimbotSettings.Enabled then return end
+    
+    -- Check Keybind
+    local keyState = Options.AimbotKey and Options.AimbotKey:GetState()
+    if not keyState then 
+        AimbotSettings.Target = nil
+        -- Reset Spring
+        AimSpring.Position = Vector3.zero
+        AimSpring.Velocity = Vector3.zero
+        return 
+    end
+    
+    -- Target Switch Delay Check
+    if tick() - AimbotSettings.LastKillTime < AimbotSettings.TargetSwitchDelay then return end
+    
+    local target = GetBestAimTarget()
+    
+    -- Reaction Delay Logic
+    if target ~= AimbotSettings.Target then
+        if AimbotSettings.Target == nil then
+             -- New target acquired from nothing
+             AimbotSettings.LastTargetTime = tick() 
+        end
+        AimbotSettings.Target = target
+        
+        -- Generate Overshoot
+        if AimbotSettings.Overshoot > 0 then
+            AimbotSettings.OvershootOffset = Vector3.new(math.random(-100,100)/100, math.random(-100,100)/100, math.random(-100,100)/100) * (AimbotSettings.Overshoot / 10)
+        else
+            AimbotSettings.OvershootOffset = Vector3.zero
+        end
+    end
+    
+    -- Check if target is still valid
+    if target and target.Parent and target.Parent:FindFirstChild("Humanoid") and target.Parent.Humanoid.Health > 0 then
+        -- Reaction Check
+        if tick() - AimbotSettings.LastTargetTime < AimbotSettings.ReactionDelay then return end
+    
+        local currentCFrame = Camera.CFrame
+        local goalPosition = target.Position
+        
+        -- Apply Deadzone Check
+        local screenPos, onScreen = Camera:WorldToViewportPoint(goalPosition)
+        if onScreen then
+            local mousePos = UserInputService:GetMouseLocation()
+            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+            if dist < AimbotSettings.Deadzone then return end
+        end
+        
+        -- Apply Jitter
+        if AimbotSettings.Jitter > 0 then
+             goalPosition = goalPosition + Vector3.new(
+                math.random(-10, 10) / 200 * AimbotSettings.Jitter, 
+                math.random(-10, 10) / 200 * AimbotSettings.Jitter, 
+                math.random(-10, 10) / 200 * AimbotSettings.Jitter
+             )
+        end
+        
+        -- Apply Overshoot Decay
+        if AimbotSettings.OvershootOffset.Magnitude > 0.01 then
+            AimbotSettings.OvershootOffset = AimbotSettings.OvershootOffset:Lerp(Vector3.zero, dt * 3)
+            goalPosition = goalPosition + AimbotSettings.OvershootOffset
+        end
+        
+        -- Aim Calculation
+        local lookVector = (goalPosition - currentCFrame.Position).Unit
+        local goalRotation = CFrame.new(currentCFrame.Position, goalPosition)
+        
+        -- STYLES
+        local style = AimbotSettings.AimStyle
+        local alpha = 1
+        
+        if style == "Spring" then
+            -- Use the internal Spring module
+            -- We update the spring target to 'lookVector' relative space or simple offset?
+            -- Easiest way for Camera CFrame lerping is calculating an Alpha based on springs.
+            -- But standard spring aimbots usually spring the mouse delta.
+            -- Let's stick to the 'Smoothing' factor hybrid for simplicity and stability in Lua.
+            
+            -- High smoothing = low factor.
+            alpha = math.clamp(1 / (AimbotSettings.Smoothing * 0.5), 0.01, 1)
+            Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha)
+            
+        elseif style == "Linear" then
+            -- Fixed speed movement
+            -- Smoothing slider acts as "Slow down". 1 = Instant, 100 = Very Slow.
+            alpha = math.clamp((100 - AimbotSettings.Smoothing) / 100 * dt * 10, 0.01, 1)
+             Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha)
+             
+        elseif style == "Sine EaseOut" then
+            -- Trig smoothing
+            local t = math.sin(tick() * 5) * 0.5 + 0.5
+            alpha = math.clamp((100 - AimbotSettings.Smoothing) / 100 * dt * 20, 0.01, 1)
+             Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha)
+             
+        elseif style == "Back EaseOut" or style == "Elastic" then
+             -- Simple Lerp with overshoot baked in
+             alpha = math.clamp(0.1 + (100 - AimbotSettings.Smoothing)/200, 0.05, 1)
+             Camera.CFrame = currentCFrame:Lerp(goalRotation, alpha * dt * 6)
+        end
+        
+    else
+        AimbotSettings.Target = nil
+    end
 end)
 
 -- [[ Attribute Logic with Caching ]] --
