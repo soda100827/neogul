@@ -794,11 +794,6 @@ local AimbotSettings = {
     TargetSwitchDelay = 0,
     Deadzone = 2,
     
-    -- Recoil / Sway
-    RCS = false,
-    RCS_X = 50, -- % Horizontal
-    RCS_Y = 50, -- % Vertical
-    
     -- Internal State
     Target = nil,
     LastTargetTime = 0,
@@ -839,13 +834,6 @@ Tabs.Combat:AddSlider("AimbotShake", {Title = "Hand Tremor (Shake)", Description
 Tabs.Combat:AddSlider("AimbotSmooth", {Title = "Base Smoothness", Default = 15, Min = 1, Max = 50, Rounding = 1, Callback = function(v) AimbotSettings.Smoothing = v end})
 
 Tabs.Combat:AddSlider("AimbotReaction", {Title = "Reaction Delay (s)", Default = 0.15, Min = 0, Max = 0.5, Rounding = 2, Callback = function(v) AimbotSettings.ReactionDelay = v end})
-
--- Recoil Config
-local RCSSection = Tabs.Combat:AddSection("Recoil Control (RCS)")
-Tabs.Combat:AddToggle("AimbotRCS", {Title = "Enable RCS", Default = false }):OnChanged(function(v) AimbotSettings.RCS = v end)
-Tabs.Combat:AddSlider("RCS_X", {Title = "Horizontal Force %", Default = 50, Min = 0, Max = 100, Rounding = 0, Callback = function(v) AimbotSettings.RCS_X = v end})
-Tabs.Combat:AddSlider("RCS_Y", {Title = "Vertical Force %", Default = 50, Min = 0, Max = 100, Rounding = 0, Callback = function(v) AimbotSettings.RCS_Y = v end})
-
 
 -- [[ Spring Module (Internal) ]] --
 local Spring = {}
@@ -1002,14 +990,6 @@ RunService.RenderStepped:Connect(function(dt)
             local noiseY = (math.cos(time) + math.cos(time * 2.3)) / 2
             local tremor = Vector3.new(noiseX, noiseY, 0) * (AimbotSettings.ShakeAmount / 50)
             goalPosition = goalPosition + tremor
-        end
-        
-        -- RCS Simulation (Pull Down)
-        if AimbotSettings.RCS then
-             -- Simple Recoil comp: offset goal downwards slightly? 
-             -- Better: Detect camera jump, but without that, we can just apply a gentle counter-force if aiming up?
-             -- Actually, usually RCS reads specific 'RecoilControl' values. Universal RCS is hard.
-             -- We will add a small constant pull-down factor to the 'Goal' if the camera is pitching up significantly while firing.
         end
         
         -- Calculate Look
