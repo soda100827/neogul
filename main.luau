@@ -18,7 +18,7 @@ local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.
 
 local Window = Fluent:CreateWindow({
     Title = "Neogul Rivals",
-    SubTitle = "by Neogul",
+    SubTitle = "제작: 너굴 (Neogul)",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
     Acrylic = true, 
@@ -27,16 +27,16 @@ local Window = Fluent:CreateWindow({
 })
 
 local Tabs = {
-    Combat = Window:AddTab({ Title = "Combat", Icon = "sword" }),
-    Movement = Window:AddTab({ Title = "Movement", Icon = "run" }),
-    Misc = Window:AddTab({ Title = "Misc", Icon = "component" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+    Combat = Window:AddTab({ Title = "전투 (Combat)", Icon = "sword" }),
+    Movement = Window:AddTab({ Title = "이동 (Movement)", Icon = "run" }),
+    Misc = Window:AddTab({ Title = "기타 (Misc)", Icon = "component" }),
+    Settings = Window:AddTab({ Title = "설정 (Settings)", Icon = "settings" })
 }
 
 local Options = Fluent.Options
 local Misc = Tabs.Misc
 
-local UnlockAll = Misc:AddToggle("UnlockAll", {Title = "Unlock All Cosmetics", Default = false })
+local UnlockAll = Misc:AddToggle("UnlockAll", {Title = "모든 스킨 해제 (Unlock All)", Default = false })
 
 -- Unlock All Logic (Comprehensive)
 -- Adapted to respect 'UnlockAll' Toggle
@@ -591,7 +591,6 @@ local SilentSettings = {
     ShowFOV = false,
     TargetPart = "Head",
     HitChance = 100,
-    Prediction = 0.135,
     DebugMode = false,
     
     -- Advanced
@@ -602,7 +601,7 @@ local SilentSettings = {
     AutoFire = false
 }
 
-local TargetBodyPart = nil
+local TargetBodyPart = nil  
 local TargetVelocity = Vector3.zero
 
 print("[Neogul] Script Loaded - Version Fixed")
@@ -626,26 +625,25 @@ else
 end
 
 -- [[ Silent Aim UI ]] --
-local SilentSection = Tabs.Combat:AddSection("Silent Aim Config")
+local SilentSection = Tabs.Combat:AddSection("사일런트 에임 설정")
 
-local ToggleSilentAvg = Tabs.Combat:AddToggle("SilentAim", {Title = "Enabled", Default = false })
+local ToggleSilentAvg = Tabs.Combat:AddToggle("SilentAim", {Title = "활성화", Default = false })
 ToggleSilentAvg:OnChanged(function(v) SilentSettings.Enabled = v end)
 
-local ToggleFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "Show FOV", Default = false })
+local ToggleFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "FOV 표시 (시야각 원)", Default = false })
 ToggleFOV:OnChanged(function(v) SilentSettings.ShowFOV = v; if FOVCircle then FOVCircle.Visible = v end end)
 
-Tabs.Combat:AddSlider("SilentAimRadius", {Title = "FOV Radius", Default = 180, Min = 10, Max = 800, Rounding = 0, Callback = function(v) SilentSettings.FOV = v; if FOVCircle then FOVCircle.Radius = v end end})
-Tabs.Combat:AddSlider("SilentAimHitChance", {Title = "Hit Chance", Default = 100, Min = 0, Max = 100, Rounding = 0, Callback = function(v) SilentSettings.HitChance = v end})
-Tabs.Combat:AddSlider("SilentAimPrediction", {Title = "Prediction", Default = 0.135, Min = 0, Max = 1, Rounding = 3, Callback = function(v) SilentSettings.Prediction = v end})
+Tabs.Combat:AddSlider("SilentAimRadius", {Title = "FOV 크기", Default = 180, Min = 10, Max = 800, Rounding = 0, Callback = function(v) SilentSettings.FOV = v; if FOVCircle then FOVCircle.Radius = v end end})
+Tabs.Combat:AddSlider("SilentAimHitChance", {Title = "명중 확률 (%)", Default = 100, Min = 0, Max = 100, Rounding = 0, Callback = function(v) SilentSettings.HitChance = v end})
 
-local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {Title = "Target Part", Values = {"Head", "HumanoidRootPart", "Random"}, Default = "Head", Multi = false, Callback = function(v) SilentSettings.TargetPart = v end})
+local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {Title = "타겟 부위", Values = {"Head", "HumanoidRootPart", "Random"}, Default = "Head", Multi = false, Callback = function(v) SilentSettings.TargetPart = v end})
 
 -- Detailed Settings
-local SilentDetailSection = Tabs.Combat:AddSection("Silent Aim Details")
-Tabs.Combat:AddToggle("SilentSmart", {Title = "Smart Targeting", Description = "Overwrites Target Part with Closest Bone", Default = false }):OnChanged(function(v) SilentSettings.SmartTargeting = v end)
-Tabs.Combat:AddToggle("SilentVisible", {Title = "Visible Check", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
-Tabs.Combat:AddToggle("SilentTeam", {Title = "Team Check", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end)
-Tabs.Combat:AddSlider("SilentDist", {Title = "Max Distance", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
+local SilentDetailSection = Tabs.Combat:AddSection("사일런트 에임 세부 설정")
+Tabs.Combat:AddToggle("SilentSmart", {Title = "스마트 타겟팅", Description = "커서와 가장 가까운 뼈를 자동으로 조준합니다", Default = false }):OnChanged(function(v) SilentSettings.SmartTargeting = v end)
+Tabs.Combat:AddToggle("SilentVisible", {Title = "벽 구분 (보이는 적만)", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
+Tabs.Combat:AddToggle("SilentTeam", {Title = "팀 구분 (아군 제외)", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end)
+Tabs.Combat:AddSlider("SilentDist", {Title = "최대 사거리", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
 
 -- [[ Silent Aim Functions ]] --
 local function GetClosestTarget()
@@ -757,11 +755,11 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                 
                 -- Only consider raycasts that travel significant distance (likely bullets)
                 if weaponRange > 10 then
-                    -- Calculate Predicted Position
-                    local predictedPos = TargetBodyPart.Position + (TargetVelocity * SilentSettings.Prediction)
+                    -- Calculate Position (No Prediction)
+                    local targetPos = TargetBodyPart.Position
                     
-                    -- Update Direction: (Predicted - Origin).Unit * Range
-                    args[2] = (predictedPos - origin).Unit * weaponRange
+                    -- Update Direction: (Target - Origin).Unit * Range
+                    args[2] = (targetPos - origin).Unit * weaponRange
                     
                     if SilentSettings.DebugMode then
                         print("[Silent Aim] Hitting:", TargetBodyPart.Parent.Name, "| Range:", weaponRange)
@@ -813,37 +811,37 @@ local AimbotSettings = {
     RandomSeed = 0
 }
 
-local AimbotSection = Tabs.Combat:AddSection("Legit Aimbot Config")
+local AimbotSection = Tabs.Combat:AddSection("레짓 에임봇 설정 (자연스러운 에임)")
 
-local AimToggle = Tabs.Combat:AddToggle("AimbotEnabled", {Title = "Aimbot Enabled", Default = false })
+local AimToggle = Tabs.Combat:AddToggle("AimbotEnabled", {Title = "에임봇 활성화", Default = false })
 AimToggle:OnChanged(function(v) AimbotSettings.Enabled = v end)
 
 local AimKey = Tabs.Combat:AddKeybind("AimbotKey", {
-    Title = "Trigger Key",
+    Title = "작동 키 (꾹 누르기)",
     Mode = "Hold",
     Default = "RightMouseButton",
     ChangedCallback = function(New) end
 })
 
 -- Targeting Config
-Tabs.Combat:AddDropdown("AimbotPart", {Title = "Target Priority", Values = {"Head", "Random", "Nearest"}, Default = "Nearest", Multi = false, Callback = function(v) AimbotSettings.TargetPart = v end})
-Tabs.Combat:AddToggle("AimbotVisibleCheck", {Title = "Visible Check", Default = true }):OnChanged(function(v) AimbotSettings.VisibleCheck = v end)
+Tabs.Combat:AddDropdown("AimbotPart", {Title = "타겟 우선순위", Values = {"Head", "Random", "Nearest"}, Default = "Nearest", Multi = false, Callback = function(v) AimbotSettings.TargetPart = v end})
+Tabs.Combat:AddToggle("AimbotVisibleCheck", {Title = "벽 구분 (보이는 적만)", Default = true }):OnChanged(function(v) AimbotSettings.VisibleCheck = v end)
 
 -- FOV Config
-local FOVSection = Tabs.Combat:AddSection("Field of View")
-Tabs.Combat:AddSlider("AimbotFOV", {Title = "FOV Radius", Default = 100, Min = 10, Max = 800, Rounding = 0, Callback = function(v) AimbotSettings.FOV = v end})
-Tabs.Combat:AddToggle("AimbotDynamicFOV", {Title = "Dynamic FOV", Description = "Adjusts FOV based on Distance", Default = false }):OnChanged(function(v) AimbotSettings.DynamicFOV = v end)
+local FOVSection = Tabs.Combat:AddSection("FOV (시야각) 설정")
+Tabs.Combat:AddSlider("AimbotFOV", {Title = "FOV 크기", Default = 100, Min = 10, Max = 800, Rounding = 0, Callback = function(v) AimbotSettings.FOV = v end})
+Tabs.Combat:AddToggle("AimbotDynamicFOV", {Title = "동적 FOV", Description = "적과의 거리에 따라 FOV를 자동으로 조절합니다", Default = false }):OnChanged(function(v) AimbotSettings.DynamicFOV = v end)
 
 -- Humanization Config
-local StyleSection = Tabs.Combat:AddSection("Humanization & Pathing")
+local StyleSection = Tabs.Combat:AddSection("인간화 & 커브 설정")
 
-Tabs.Combat:AddDropdown("AimStyle", {Title = "Aim Behavior", Values = {"Mouse", "Spring", "Linear"}, Default = "Mouse", Multi = false, Callback = function(v) AimbotSettings.AimStyle = v end})
-Tabs.Combat:AddSlider("AimbotCurve", {Title = "Mouse Curve", Description = "Adds realistic arcs to aim path", Default = 1, Min = 0, Max = 10, Rounding = 1, Callback = function(v) AimbotSettings.CurveAmount = v end})
-Tabs.Combat:AddSlider("AimbotShake", {Title = "Hand Tremor (Shake)", Description = "Constant micro-movements", Default = 0, Min = 0, Max = 10, Rounding = 1, Callback = function(v) AimbotSettings.ShakeAmount = v end})
+Tabs.Combat:AddDropdown("AimStyle", {Title = "에임 스타일", Values = {"Mouse", "Spring", "Linear"}, Default = "Mouse", Multi = false, Callback = function(v) AimbotSettings.AimStyle = v end})
+Tabs.Combat:AddSlider("AimbotCurve", {Title = "마우스 커브 (곡선 이동)", Description = "에임이 직선이 아닌 곡선으로 이동하여 사람처럼 보입니다", Default = 1, Min = 0, Max = 10, Rounding = 1, Callback = function(v) AimbotSettings.CurveAmount = v end})
+Tabs.Combat:AddSlider("AimbotShake", {Title = "손떨림 효과", Description = "에임에 미세한 떨림을 추가합니다", Default = 0, Min = 0, Max = 10, Rounding = 1, Callback = function(v) AimbotSettings.ShakeAmount = v end})
 
-Tabs.Combat:AddSlider("AimbotSmooth", {Title = "Base Smoothness", Default = 15, Min = 1, Max = 50, Rounding = 1, Callback = function(v) AimbotSettings.Smoothing = v end})
+Tabs.Combat:AddSlider("AimbotSmooth", {Title = "부드러움 (Smoothing)", Default = 15, Min = 1, Max = 50, Rounding = 1, Callback = function(v) AimbotSettings.Smoothing = v end})
 
-Tabs.Combat:AddSlider("AimbotReaction", {Title = "Reaction Delay (s)", Default = 0.15, Min = 0, Max = 0.5, Rounding = 2, Callback = function(v) AimbotSettings.ReactionDelay = v end})
+Tabs.Combat:AddSlider("AimbotReaction", {Title = "반응 지연 (초)", Default = 0.15, Min = 0, Max = 0.5, Rounding = 2, Callback = function(v) AimbotSettings.ReactionDelay = v end})
 
 -- [[ Spring Module (Internal) ]] --
 local Spring = {}
@@ -1105,15 +1103,16 @@ end
 -- // Combat Features //
 
 -- [[ Gun Mods ]] --
-local GunMods = Tabs.Combat:AddSection("Gun Mods")
+-- [[ Gun Mods ]] --
+local GunMods = Tabs.Combat:AddSection("총기 설정")
 
-local NoRecoil = Tabs.Combat:AddToggle("NoRecoil", {Title = "No Recoil", Default = false })
-local NoSpread = Tabs.Combat:AddToggle("NoSpread", {Title = "No Spread", Default = false })
-local NoMuzzle = Tabs.Combat:AddToggle("NoMuzzle", {Title = "No Muzzle Flash", Default = false })
+local NoRecoil = Tabs.Combat:AddToggle("NoRecoil", {Title = "무반동 (No Recoil)", Default = false })
+local NoSpread = Tabs.Combat:AddToggle("NoSpread", {Title = "무탄퍼짐 (No Spread)", Default = false })
+local NoMuzzle = Tabs.Combat:AddToggle("NoMuzzle", {Title = "총구 섬광 제거 (No Muzzle)", Default = false })
 
 local GunCooldown = Tabs.Combat:AddSlider("GunCooldown", {
-    Title = "Attack Cooldown",
-    Description = "Reduces gun delays (0% = Instant)",
+    Title = "공격 쿨타임",
+    Description = "총기 발사 딜레이를 줄입니다 (0% = 즉시 발사)",
     Default = 100,
     Min = 0,
     Max = 100,
@@ -1212,14 +1211,15 @@ end)
 
 
 -- [[ Melee Mods ]] --
-local MeleeMods = Tabs.Combat:AddSection("Melee")
+-- [[ Melee Mods ]] --
+local MeleeMods = Tabs.Combat:AddSection("근접 무기 설정")
 
-local MeleeAura = Tabs.Combat:AddToggle("MeleeAura", {Title = "Melee Aura (Reach)", Default = false })
-local TeleportAura = Tabs.Combat:AddToggle("TeleportAura", {Title = "Target Strafe (Chaotic TP)", Default = false })
+local MeleeAura = Tabs.Combat:AddToggle("MeleeAura", {Title = "근접 오라 (범위 증가)", Default = false })
+local TeleportAura = Tabs.Combat:AddToggle("TeleportAura", {Title = "타겟 추적 (순간이동)", Default = false })
 
 local MeleeCooldown = Tabs.Combat:AddSlider("MeleeCooldown", {
-    Title = "Attack Cooldown",
-    Description = "Reduces melee/skill delays",
+    Title = "공격 쿨타임",
+    Description = "근접 공격 및 스킬 딜레이를 줄입니다",
     Default = 100,
     Min = 0,
     Max = 100,
@@ -1232,11 +1232,11 @@ local MeleeCooldown = Tabs.Combat:AddSlider("MeleeCooldown", {
 })
 
 -- [[ Skill Mods ]] --
-local SkillMods = Tabs.Combat:AddSection("Skills")
+local SkillMods = Tabs.Combat:AddSection("스킬 설정")
 
 local SkillCooldown = Tabs.Combat:AddSlider("SkillCooldown", {
-    Title = "Skill Cooldown",
-    Description = "Reduces special ability delays (Dash, Spin, etc.)",
+    Title = "스킬 쿨타임",
+    Description = "특수 능력 (대시, 회전 등)의 딜레이를 줄입니다",
     Default = 100,
     Min = 0,
     Max = 100,
@@ -1306,8 +1306,8 @@ end)
 -- // Movement Features //
 
 local WalkSpeed = Tabs.Movement:AddSlider("WalkSpeed", {
-    Title = "WalkSpeed",
-    Description = "Adjusts movement speed",
+    Title = "이동 속도 (WalkSpeed)",
+    Description = "캐릭터의 이동 속도를 조절합니다",
     Default = 16,
     Min = 16,
     Max = 1000,
@@ -1316,8 +1316,8 @@ local WalkSpeed = Tabs.Movement:AddSlider("WalkSpeed", {
 })
 
 local JumpPower = Tabs.Movement:AddSlider("JumpPower", {
-    Title = "JumpPower",
-    Description = "Adjusts jump height",
+    Title = "점프력 (JumpPower)",
+    Description = "점프 높이를 조절합니다",
     Default = 50,
     Min = 50,
     Max = 1000,
@@ -1325,12 +1325,12 @@ local JumpPower = Tabs.Movement:AddSlider("JumpPower", {
     Callback = function(Value) end
 })
 
-local InfiniteJump = Tabs.Movement:AddToggle("InfiniteJump", {Title = "Infinite Jump", Default = false })
-local Noclip = Tabs.Movement:AddToggle("Noclip", {Title = "Noclip (Walk Through Walls)", Default = false })
-local Fly = Tabs.Movement:AddToggle("Fly", {Title = "Fly", Default = false })
+local InfiniteJump = Tabs.Movement:AddToggle("InfiniteJump", {Title = "무한 점프", Default = false })
+local Noclip = Tabs.Movement:AddToggle("Noclip", {Title = "노클립 (벽 통과)", Default = false })
+local Fly = Tabs.Movement:AddToggle("Fly", {Title = "비행 (Fly)", Default = false })
 local FlySpeed = Tabs.Movement:AddSlider("FlySpeed", {
-    Title = "Fly Speed",
-    Description = "Speed while flying",
+    Title = "비행 속도",
+    Description = "비행 시 이동 속도를 조절합니다",
     Default = 50,
     Min = 10,
     Max = 1000,
