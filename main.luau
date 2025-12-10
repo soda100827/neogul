@@ -4,6 +4,14 @@ pcall(function()
     if analytics then analytics:Destroy() end
 end)
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
@@ -576,6 +584,104 @@ local function ApplyAttributes(attributes, isRestore)
 end
 
 -- // Combat Features //
+
+-- // Silent Aim Feature //
+local SilentAim = Tabs.Combat:AddToggle("SilentAim", {Title = "Silent Aim", Default = false })
+local SilentAimFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "Silent Aim FOV (Circle)", Default = false })
+local SilentAimRadius = Tabs.Combat:AddSlider("SilentAimRadius", {
+    Title = "FOV Radius",
+    Description = "Radius of the FOV circle",
+    Default = 100,
+    Min = 10,
+    Max = 1000,
+    Rounding = 1,
+    Callback = function(Value) end
+})
+local SilentAimHitChance = Tabs.Combat:AddSlider("SilentAimHitChance", {
+    Title = "Hit Chance",
+    Description = "Chance of hitting the target (0-100)",
+    Default = 100,
+    Min = 0,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(Value) end
+})
+local SilentAimPart = Tabs.Combat:AddDropdown("SilentAimPart", {
+    Title = "Target Part",
+    Values = {"Head", "HumanoidRootPart", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"},
+    Multi = false,
+    Default = 1,
+})
+
+-- FOV Circle Visual
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Visible = false
+FOVCircle.Thickness = 1.5
+FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.NumSides = 64
+
+RunService.RenderStepped:Connect(function()
+    FOVCircle.Radius = Options.SilentAimRadius.Value
+    FOVCircle.Position = UserInputService:GetMouseLocation()
+    FOVCircle.Visible = Options.SilentAimFOV.Value
+end)
+
+local function getClosestPlayerToCursor()
+    local target = nil
+    local shortestDist = math.huge
+    local mousePos = UserInputService:GetMouseLocation()
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+
+            
+            local part = p.Character:FindFirstChild(SilentAimPart.Value) or p.Character:FindFirstChild("Head")
+            if part then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortestDist then
+                        if Options.SilentAimFOV.Value and dist > Options.SilentAimRadius.Value then continue end
+                        target = part
+                        shortestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return target
+end
+
+-- Hook Raycast for Silent Aim
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if method == "Raycast" and Options.SilentAim.Value then
+        if math.random(1, 100) <= Options.SilentAimHitChance.Value then
+             local callingScript = getcallingscript()
+             local validScripts = {
+                ["Equipment"] = true,
+                ["FighterController"] = true,
+                ["PlayerDataController"] = true,
+                ["ControlsController"] = true
+             }
+             
+             if validScripts[tostring(callingScript)] then
+                local target = getClosestPlayerToCursor()
+                if target then
+                    args[2] = (target.Position - args[1]).Unit * 1000
+                    return oldNamecall(self, table.unpack(args))
+                end
+             end
+        end
+    end
+    
+    return oldNamecall(self, ...)
+end)
 
 -- [[ Attribute Logic with Caching ]] --
 local AttributeCache = setmetatable({}, { __mode = "k" })
