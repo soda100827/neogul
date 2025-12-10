@@ -673,8 +673,12 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
              if validScripts[tostring(callingScript)] then
                 local target = getClosestPlayerToCursor()
                 if target then
-                    args[2] = (target.Position - args[1]).Unit * 1000
-                    return oldNamecall(self, table.unpack(args))
+                    -- Validate arguments before math operations
+                    local origin = args[1]
+                    if typeof(origin) == "Vector3" then
+                         args[2] = (target.Position - origin).Unit * 1000
+                         return oldNamecall(self, table.unpack(args))
+                    end
                 end
              end
         end
