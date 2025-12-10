@@ -605,14 +605,25 @@ local SilentSettings = {
 local TargetBodyPart = nil
 local TargetVelocity = Vector3.zero
 
+print("[Neogul] Script Loaded - Version Fixed")
+
 -- FOV Circle Visual
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = false
-FOVCircle.Thickness = 1.5
-FOVCircle.Color = Color3.fromRGB(255, 255, 255)
-FOVCircle.Filled = false
-FOVCircle.Transparency = 1
-FOVCircle.NumSides = 64
+local FOVCircle = nil
+local success, result = pcall(function()
+    return Drawing.new("Circle")
+end)
+
+if success and result then
+    FOVCircle = result
+    FOVCircle.Visible = false
+    FOVCircle.Thickness = 1.5
+    FOVCircle.Color = Color3.fromRGB(255, 255, 255)
+    FOVCircle.Filled = false
+    FOVCircle.Transparency = 1
+    FOVCircle.NumSides = 64
+else
+    warn("[Neogul] Drawing library not supported or failed to create Circle.")
+end
 
 -- [[ Silent Aim UI ]] --
 local SilentSection = Tabs.Combat:AddSection("Silent Aim Config")
