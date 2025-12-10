@@ -665,15 +665,12 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
              local callingScript = getcallingscript()
              local validScripts = {
                 ["Equipment"] = true,
-                ["FighterController"] = true,
-                ["PlayerDataController"] = true,
-                ["ControlsController"] = true
+                ["FighterController"] = true
              }
              
              if validScripts[tostring(callingScript)] then
                 local target = getClosestPlayerToCursor()
                 if target then
-                    -- Validate arguments before math operations
                     local origin = args[1]
                     if typeof(origin) == "Vector3" then
                          args[2] = (target.Position - origin).Unit * 1000
