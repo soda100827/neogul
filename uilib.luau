@@ -2142,12 +2142,10 @@ function library:Init(key)
             local contextGradient = Instance.new("UIGradient")
             
             contextMenu.Name = "ContextMenu"
-            contextMenu.Parent = keybindFrame -- Parent to keybindFrame to act as popup
+            contextMenu.Parent = screen -- Parent to ScreenGui to avoid ClipsDescendants
             contextMenu.BackgroundColor3 = Color3.fromRGB(45, 45, 45) -- Fallback
             contextMenu.BorderSizePixel = 0
             contextMenu.Size = UDim2.new(0, 100, 0, 0)
-            -- Position to the right of the keybind button, slightly overlapping or adjacent
-            contextMenu.Position = UDim2.new(1, -105, 1, 5) -- Below and aligned right
             contextMenu.Visible = false
             contextMenu.ClipsDescendants = true
             contextMenu.ZIndex = 20
@@ -2213,6 +2211,12 @@ function library:Init(key)
             local function toggleContextMenu()
                 contextMenu.Visible = not contextMenu.Visible
                 if contextMenu.Visible then
+                    -- Calculate absolute position to place it near the button logic
+                    -- Since we are now in ScreenGui, we need AbsolutePosition of the button
+                    local btnPos = keybindButton.AbsolutePosition
+                    -- Adjust specific offset
+                    contextMenu.Position = UDim2.new(0, btnPos.X + keybindButton.AbsoluteSize.X + 10, 0, btnPos.Y)
+                    
                     contextMenu:TweenSize(UDim2.new(0, 100, 0, 24 * 3), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
                 else
                     contextMenu:TweenSize(UDim2.new(0, 100, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
@@ -2222,6 +2226,13 @@ function library:Init(key)
             -- Right Click to Open Context Menu
             keybindButton.MouseButton2Click:Connect(toggleContextMenu)
             keybind.MouseButton2Click:Connect(toggleContextMenu)
+            
+            -- Cleanup on Destroy
+            keybindButton.AncestryChanged:Connect(function()
+                if not keybindButton:IsDescendantOf(game) then
+                    contextMenu:Destroy()
+                end
+            end)
 
             -- Close when clicking outside
             UserInputService.InputBegan:Connect(function(input)
