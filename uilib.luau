@@ -3571,6 +3571,40 @@ function library:Init(key)
         key = new
         return TabLibrary
     end
+    -- Default Settings Tab
+    local Settings = TabLibrary:NewTab("Settings")
+    
+    -- Fix Order & Visuals (Settings at bottom, inactive)
+    for _, v in pairs(tabButtons:GetChildren()) do
+        if v:IsA("TextButton") and v.Text == "Settings" then
+             v.LayoutOrder = 99999
+             v.TextColor3 = Color3.fromRGB(170, 170, 170)
+        end
+    end
+    
+    -- Hide Settings Page
+    for _, v in pairs(container:GetChildren()) do
+        if v.Name == "page" then
+             v.Visible = false
+        end
+    end
+    
+    -- Reset First Flag for User
+    TabLibrary.IsFirst = true
+    
+    -- Populate Settings
+    Settings:NewSection("Menu")
+    Settings:NewKeybind("Keybind", key, function(v)
+        local k = v
+        if type(v) == "string" then
+           k = Enum.KeyCode[v]
+        end
+        TabLibrary:UpdateKeybind(k)
+    end)
+    Settings:NewButton("Unload", function()
+        TabLibrary:Remove()
+    end)
+
     return TabLibrary
 end
 return library
