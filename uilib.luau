@@ -35,24 +35,25 @@ local drag = function(obj, latency)
     obj = obj
     latency = latency or 0.06
 
-    toggled = nil
-    input = nil
-    start = nil
+    local isDragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
 
-    function updateInput(input)
-        local Delta = input.Position - start
+    local function updateInput(input)
+        local Delta = input.Position - dragStart
         local Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + Delta.X, startPos.Y.Scale, startPos.Y.Offset + Delta.Y)
         TweenService:Create(obj, TweenInfo.new(latency), {Position = Position}):Play()
     end
 
     obj.InputBegan:Connect(function(inp)
         if (inp.UserInputType == Enum.UserInputType.MouseButton1) then
-            toggled = true
-            start = inp.Position
+            isDragging = true
+            dragStart = inp.Position
             startPos = obj.Position
             inp.Changed:Connect(function()
                 if (inp.UserInputState == Enum.UserInputState.End) then
-                    toggled = false
+                    isDragging = false
                 end
             end)
         end
@@ -60,12 +61,12 @@ local drag = function(obj, latency)
 
     obj.InputChanged:Connect(function(inp)
         if (inp.UserInputType == Enum.UserInputType.MouseMovement) then
-            input = inp
+            dragInput = inp
         end
     end)
 
     UserInputService.InputChanged:Connect(function(inp)
-        if (inp == input and toggled) then
+        if (inp == dragInput and isDragging) then
             updateInput(inp)
         end
     end)
