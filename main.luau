@@ -54,13 +54,10 @@ AimGroup:AddDropdown('AimbotPart', { Values = { 'Head', 'Random', 'Nearest' }, D
 AimGroup:AddLabel('Settings')
 AimGroup:AddToggle('AimbotSticky', { Text = 'Sticky Aim', Default = false, Tooltip = 'Keeps aiming at the target even if they leave FOV until key release' })
 AimGroup:AddSlider('AimbotSmooth', { Text = 'Smoothing (Strength)', Default = 5, Min = 1, Max = 20, Rounding = 1 })
-
-AimGroup:AddLabel('Settings')
-AimGroup:AddToggle('AimbotSticky', { Text = 'Sticky Aim', Default = false, Tooltip = 'Keeps aiming at the target even if they leave FOV until key release' })
-AimGroup:AddSlider('AimbotSmooth', { Text = 'Smoothing (Strength)', Default = 5, Min = 1, Max = 20, Rounding = 1 })
 AimGroup:AddLabel('Humanization')
 AimGroup:AddSlider('AimbotDeadzone', { Text = 'Deadzone (Strafe)', Default = 2, Min = 0, Max = 10, Rounding = 1, Tooltip = 'Ignores small mouse movements' })
 AimGroup:AddSlider('AimbotReaction', { Text = 'Reaction Time (s)', Default = 0.1, Min = 0, Max = 1.0, Rounding = 2, Tooltip = 'Delay before aiming at a new target' })
+local GunModsGroup = Tabs.Combat:AddRightGroupbox('Gun Mods')
 GunModsGroup:AddToggle('NoRecoil', { Text = 'No Recoil', Default = false })
 GunModsGroup:AddToggle('NoSpread', { Text = 'No Spread', Default = false })
 GunModsGroup:AddToggle('NoMuzzle', { Text = 'No Muzzle Flash', Default = false })
@@ -302,7 +299,8 @@ end)
 local SilentSettings = {
     Enabled = false, FOV = 180, ShowFOV = false, TargetPart = "Head", HitChance = 100,
     DebugMode = false, VisibleCheck = false, TeamCheck = true, SmartTargeting = false,
-    MaxDistance = 1000, AutoFire = false, WallCheckType = "Raycast"
+    MaxDistance = 1000, AutoFire = false, WallCheckType = "Raycast",
+    LastScan = 0, CachedTarget = nil, CachedVelocity = Vector3.zero 
 }
 
 local AimbotSettings = {
@@ -310,7 +308,7 @@ local AimbotSettings = {
     FOV = 100, DynamicFOV = false, ShowFOV = false, AimStyle = "Mouse", Smoothing = 10,
     CurveAmount = 1, ShakeAmount = 0, MinSpeed = 1, MaxSpeed = 5,
     ReactionDelay = 0.15, Deadzone = 2, Target = nil, LastTargetTime = 0, LastTargetObj = nil,
-    CurveOffset = Vector3.zero, StickyAim = false
+    CurveOffset = Vector3.zero, StickyAim = false, LastScan = 0, CachedTarget = nil
 }
 
 local function SyncSettings()
@@ -446,6 +444,10 @@ end)
 
 
 local function GetClosestTarget()
+    -- Throttle check 0.05s
+    if (tick() - (SilentSettings.LastScan or 0)) < 0.05 then return SilentSettings.CachedTarget, SilentSettings.CachedVelocity end
+    SilentSettings.LastScan = tick()
+
     local closestPart, closestVelocity, maxDist = nil, Vector3.zero, SilentSettings.FOV
     local mousePos = UserInputService:GetMouseLocation()
     for _, p in ipairs(Players:GetPlayers()) do
@@ -490,10 +492,16 @@ local function GetClosestTarget()
             end
         end
     end
+    SilentSettings.CachedTarget = closestPart
+    SilentSettings.CachedVelocity = closestVelocity
     return closestPart, closestVelocity
 end
 
 local function GetBestAimTarget()
+    -- Throttle check 0.05s
+    if (tick() - (AimbotSettings.LastScan or 0)) < 0.05 then return AimbotSettings.CachedTarget end
+    AimbotSettings.LastScan = tick()
+
     -- Simplified Aimbot Target Search
     local bestTarget, bestScore = nil, math.huge
     local mousePos = UserInputService:GetMouseLocation()
@@ -520,6 +528,7 @@ local function GetBestAimTarget()
             end
         end
     end
+    AimbotSettings.CachedTarget = bestTarget
     return bestTarget
 end
 
@@ -558,6 +567,7 @@ RunService.RenderStepped:Connect(function(dt)
                  AimbotSettings.LastTargetTime = tick()
             end
             
+            local goal = nil
             if (tick() - AimbotSettings.LastTargetTime) < AimbotSettings.ReactionDelay then
                  -- Wait for reaction
                  goal = nil
