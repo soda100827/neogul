@@ -12,31 +12,42 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+local Luna = loadstring(game:HttpGet("https://raw.githubusercontent.com/Nebula-Softworks/Luna-Interface-Suite/refs/heads/master/source.lua", true))()
 
-local Window = Fluent:CreateWindow({
-    Title = "Neogul Rivals",
-    SubTitle = "제작: 너굴 (Neogul)",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = true, 
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
+-- Define Options table to store UI elements for global access
+local Options = {}
+
+local Window = Luna:CreateWindow({
+    Name = "Neogul Rivals",
+    Subtitle = "제작: 너굴 (Neogul)",
+    LogoID = nil, 
+    LoadingEnabled = true,
+    LoadingTitle = "Neogul Rivals",
+    LoadingSubtitle = "by Nebula Softworks",
+
+    ConfigSettings = {
+        RootFolder = nil,
+        ConfigFolder = "NeogulRivals"
+    },
+
+    KeySystem = false
 })
 
 local Tabs = {
-    Combat = Window:AddTab({ Title = "전투 (Combat)", Icon = "sword" }),
-    Movement = Window:AddTab({ Title = "이동 (Movement)", Icon = "run" }),
-    Misc = Window:AddTab({ Title = "기타 (Misc)", Icon = "component" }),
-    Settings = Window:AddTab({ Title = "설정 (Settings)", Icon = "settings" })
+    Combat = Window:CreateTab({ Name = "전투 (Combat)", Icon = "gavel", ImageSource = "Material" }),
+    Movement = Window:CreateTab({ Name = "이동 (Movement)", Icon = "explore", ImageSource = "Material" }),
+    Misc = Window:CreateTab({ Name = "기타 (Misc)", Icon = "view_list", ImageSource = "Material" }),
+    Settings = Window:CreateTab({ Name = "설정 (Settings)", Icon = "settings", ImageSource = "Material" })
 }
 
-local Options = Fluent.Options
 local Misc = Tabs.Misc
 
-local UnlockAll = Misc:AddToggle("UnlockAll", {Title = "모든 스킨 해제 (Unlock All)", Default = false })
+local UnlockAll = Misc:CreateToggle({
+    Name = "모든 스킨 해제 (Unlock All)",
+    CurrentValue = false,
+    Callback = function(Value) end
+}, "UnlockAll")
+Options.UnlockAll = UnlockAll
 
 -- Unlock All Logic (Comprehensive)
 -- Adapted to respect 'UnlockAll' Toggle
@@ -131,7 +142,7 @@ task.spawn(function()
     local originalOwnsCosmeticForWeapon = CosmeticLibrary.OwnsCosmeticForWeapon
 
     CosmeticLibrary.OwnsCosmeticNormally = function(...) 
-        if not Options.UnlockAll.Value then 
+        if not Options.UnlockAll.CurrentValue then 
             if originalOwnsCosmeticNormally then return originalOwnsCosmeticNormally(...) end
             return false 
         end
@@ -139,7 +150,7 @@ task.spawn(function()
     end 
     
     CosmeticLibrary.OwnsCosmeticUniversally = function(...) 
-        if not Options.UnlockAll.Value then 
+        if not Options.UnlockAll.CurrentValue then 
              if originalOwnsCosmeticUniversally then return originalOwnsCosmeticUniversally(...) end
              return false
         end
@@ -147,7 +158,7 @@ task.spawn(function()
     end
 
     CosmeticLibrary.OwnsCosmeticForWeapon = function(...)
-        if not Options.UnlockAll.Value then
+        if not Options.UnlockAll.CurrentValue then
             if originalOwnsCosmeticForWeapon then return originalOwnsCosmeticForWeapon(...) end
             return false
         end
@@ -155,7 +166,7 @@ task.spawn(function()
     end
 
     CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
-        if not Options.UnlockAll.Value then return originalOwnsCosmetic(self, inventory, name, weapon) end
+        if not Options.UnlockAll.CurrentValue then return originalOwnsCosmetic(self, inventory, name, weapon) end
         if name:find("MISSING_") then return originalOwnsCosmetic(self, inventory, name, weapon) end
         return true
     end
@@ -164,7 +175,7 @@ task.spawn(function()
     local originalGet = DataController.Get
     DataController.Get = function(self, key)
         local data = originalGet(self, key)
-        if not Options.UnlockAll.Value then return data end
+        if not Options.UnlockAll.CurrentValue then return data end
 
         if key == "CosmeticInventory" then
             local proxy = {}
@@ -185,7 +196,7 @@ task.spawn(function()
     local originalGetWeaponData = DataController.GetWeaponData
     DataController.GetWeaponData = function(self, weaponName)
         local data = originalGetWeaponData(self, weaponName)
-        if not Options.UnlockAll.Value then return data end
+        if not Options.UnlockAll.CurrentValue then return data end
         if not data then return nil end
         
         local merged = {}
@@ -233,7 +244,7 @@ task.spawn(function()
                 end            
                 
                 if self == equipRemote then
-                    if not Options.UnlockAll.Value then return oldNamecall(self, ...) end
+                    if not Options.UnlockAll.CurrentValue then return oldNamecall(self, ...) end
 
                     local weaponName, cosmeticType, cosmeticName, options = args[1], args[2], args[3], args[4] or {}                
                     if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
@@ -258,7 +269,7 @@ task.spawn(function()
                 end            
                 
                 if self == favoriteRemote then
-                     if not Options.UnlockAll.Value then return oldNamecall(self, ...) end
+                     if not Options.UnlockAll.CurrentValue then return oldNamecall(self, ...) end
                      
                     favorites[args[1]] = favorites[args[1]] or {}
                     favorites[args[1]][args[2]] = args[3] or nil
@@ -278,7 +289,7 @@ task.spawn(function()
     if ClientItem and ClientItem._CreateViewModel then
         local originalCreateViewModel = ClientItem._CreateViewModel
         ClientItem._CreateViewModel = function(self, viewmodelRef)
-            if not Options.UnlockAll.Value then return originalCreateViewModel(self, viewmodelRef) end
+            if not Options.UnlockAll.CurrentValue then return originalCreateViewModel(self, viewmodelRef) end
 
             local weaponName = self.Name
             local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
@@ -305,7 +316,7 @@ task.spawn(function()
         if ClientViewModel.GetWrap then
             local originalGetWrap = ClientViewModel.GetWrap
             ClientViewModel.GetWrap = function(self)
-                if not Options.UnlockAll.Value then return originalGetWrap(self) end
+                if not Options.UnlockAll.CurrentValue then return originalGetWrap(self) end
                 
                 local weaponName = self.ClientItem and self.ClientItem.Name
                 local weaponPlayer = self.ClientItem and self.ClientItem.ClientFighter and self.ClientItem.ClientFighter.Player
@@ -318,7 +329,7 @@ task.spawn(function()
         
         local originalNew = ClientViewModel.new
         ClientViewModel.new = function(replicatedData, clientItem)
-             if not Options.UnlockAll.Value then return originalNew(replicatedData, clientItem) end
+             if not Options.UnlockAll.CurrentValue then return originalNew(replicatedData, clientItem) end
 
             local weaponPlayer = clientItem.ClientFighter and clientItem.ClientFighter.Player
             local weaponName = constructingWeapon or clientItem.Name
@@ -343,14 +354,18 @@ task.spawn(function()
     if ItemLibrary then
         local originalGetViewModelImage = ItemLibrary.GetViewModelImageFromWeaponData
         ItemLibrary.GetViewModelImageFromWeaponData = function(self, weaponData, highRes)
-            if not Options.UnlockAll.Value then return originalGetViewModelImage(self, weaponData, highRes) end
+            if not Options.UnlockAll.CurrentValue then return originalGetViewModelImage(self, weaponData, highRes) end
             
             if not weaponData then return originalGetViewModelImage(self, weaponData, highRes) end
             local weaponName = weaponData.Name
             local shouldShowSkin = (weaponData.Skin and equipped[weaponName] and weaponData.Skin == equipped[weaponName].Skin) or (viewingProfile == player and equipped[weaponName] and equipped[weaponName].Skin)
             if shouldShowSkin and equipped[weaponName] and equipped[weaponName].Skin then
                 local skinInfo = self.ViewModels[equipped[weaponName].Skin.Name]
-                if skinInfo then return skinInfo[highRes and "ImageHighResolution" or "Image"] or skinInfo.Image end
+                if skinInfo then 
+                    local img = skinInfo[highRes and "ImageHighResolution" or "Image"] or skinInfo.Image
+                    if type(img) == "table" then return "" end -- Prevent crash
+                    return img
+                end
             end
             return originalGetViewModelImage(self, weaponData, highRes)
         end
@@ -374,7 +389,7 @@ task.spawn(function()
         if ClientEntity and ClientEntity.ReplicateFromServer then
             local originalReplicateFromServer = ClientEntity.ReplicateFromServer
             ClientEntity.ReplicateFromServer = function(self, action, ...)
-                if not Options.UnlockAll.Value then return originalReplicateFromServer(self, action, ...) end
+                if not Options.UnlockAll.CurrentValue then return originalReplicateFromServer(self, action, ...) end
                 
                 if action == "FinisherEffect" then
                     local args = {...}
@@ -407,7 +422,12 @@ task.spawn(function()
     print("Unlock All Loaded")
 end)
 
-local SpamMessage = Misc:AddToggle("SpamMessage", {Title = "Spam Message", Default = false })
+local SpamMessage = Misc:CreateToggle({
+    Name = "Spam Message",
+    CurrentValue = false,
+    Callback = function(Value) end
+}, "SpamMessage")
+Options.SpamMessage = SpamMessage
 
 -- Auto Chat Spam Logic
 task.spawn(function()
@@ -420,7 +440,7 @@ task.spawn(function()
     
     while true do
         task.wait(3) -- Adjusted wait time to 3s per user example
-        if Options.SpamMessage and Options.SpamMessage.Value then
+        if Options.SpamMessage and Options.SpamMessage.CurrentValue then
             local msg = messages[math.random(1, #messages)]
             
             pcall(function()
@@ -444,10 +464,13 @@ task.spawn(function()
 end)
 
 
-local AutoLoad = Misc:AddToggle("AutoLoad", {Title = "Auto Load Script", Default = false })
-AutoLoad:OnChanged(function()
-    if Options.AutoLoad.Value then
-        local qot = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport)
+local AutoLoad = Misc:CreateToggle({
+    Name = "Auto Load Script",
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            -- Logic handled in callback instead of OnChanged for Luna
+             local qot = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport)
         if qot then
             -- Save current script to file for persistence
             local fileName = "neogul_rivals_autoload.lua"
@@ -480,26 +503,37 @@ AutoLoad:OnChanged(function()
                 -- We will try to write a placeholder loader or if we assume this is the 'main.luau' editing.
                 
                 -- Let's act as if this is the setup: notify user to ensure file is saved.
-                 Fluent:Notify({Title = "Auto Load", Content = "Ensuring '"..fileName.."' is loaded next.", Duration = 3})
+                 Luna:Notification({Title = "Auto Load", Content = "Ensuring '"..fileName.."' is loaded next.", Icon = "save", ImageSource = "Lucide"})
             else
-                 Fluent:Notify({Title = "Error", Content = "writefile not supported.", Duration = 5})
+                 Luna:Notification({Title = "Error", Content = "writefile not supported.", Icon = "alert-triangle", ImageSource = "Lucide"})
             end
         else
-            Fluent:Notify({Title = "Error", Content = "queue_on_teleport not supported.", Duration = 5})
+            Luna:Notification({Title = "Error", Content = "queue_on_teleport not supported.", Icon = "alert-triangle", ImageSource = "Lucide"})
         end
     end
-end)
+end
+}, "AutoLoad")
+Options.AutoLoad = AutoLoad
 
-local AntiUnnamed = Misc:AddToggle("AntiUnnamed", {Title = "Anti Unnamed (God Mode)", Default = false })
+local AntiUnnamed = Misc:CreateToggle({
+    Name = "Anti Unnamed (God Mode)",
+    CurrentValue = false,
+    Callback = function(Value) end
+}, "AntiUnnamed")
+Options.AntiUnnamed = AntiUnnamed
 
-Misc:AddKeybind("AntiUnnamedKey", {
-    Title = "Anti Unnamed Keybind",
-    Mode = "Toggle",
-    Default = "RightAlt",
-    Callback = function(Value)
-        Options.AntiUnnamed:SetValue(Value)
-    end
-})
+Misc:CreateBind({
+    Name = "Anti Unnamed Keybind",
+    CurrentBind = "RightAlt",
+    HoldToInteract = false,
+    Callback = function()
+        -- Toggle the AntiUnnamed value
+        local current = Options.AntiUnnamed.CurrentValue
+        Options.AntiUnnamed:Set({ CurrentValue = not current })
+        Options.AntiUnnamed.Callback(not current) -- Manually trigger if Set doesn't
+    end,
+    OnChangedCallback = function(Bind) end
+}, "AntiUnnamedKey")
 
 -- Anti Unnamed Logic
 task.spawn(function()
@@ -508,7 +542,7 @@ task.spawn(function()
     local originalPos = nil
     
     RunService.Heartbeat:Connect(function()
-        if Options.AntiUnnamed and Options.AntiUnnamed.Value then
+        if Options.AntiUnnamed and Options.AntiUnnamed.CurrentValue then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 local root = char.HumanoidRootPart
@@ -547,19 +581,23 @@ task.spawn(function()
     end)
 end)
 
-local FullBright = Misc:AddToggle("FullBright", {Title = "Full Bright", Default = false })
-FullBright:OnChanged(function()
-    if Options.FullBright.Value then
-        game:GetService("Lighting").Brightness = 2
-        game:GetService("Lighting").ClockTime = 14
-        game:GetService("Lighting").FogEnd = 100000
-        game:GetService("Lighting").GlobalShadows = false
-        game:GetService("Lighting").OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-    else
-        game:GetService("Lighting").Brightness = 1
-        game:GetService("Lighting").GlobalShadows = true
+local FullBright = Misc:CreateToggle({
+    Name = "Full Bright", 
+    CurrentValue = false,
+    Callback = function(Value)
+        if Value then
+            game:GetService("Lighting").Brightness = 2
+            game:GetService("Lighting").ClockTime = 14
+            game:GetService("Lighting").FogEnd = 100000
+            game:GetService("Lighting").GlobalShadows = false
+            game:GetService("Lighting").OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        else
+            game:GetService("Lighting").Brightness = 1
+            game:GetService("Lighting").GlobalShadows = true
+        end
     end
-end)
+}, "FullBright")
+Options.FullBright = FullBright
 
 -- // Attribute Manager //
 -- Used to modify table values found in Garbage Collector and restore them if needed.
@@ -637,26 +675,76 @@ else
 end
 
 -- [[ Silent Aim UI ]] --
-local SilentSection = Tabs.Combat:AddSection("사일런트 에임 설정")
+-- [[ Silent Aim UI ]] --
+Tabs.Combat:CreateSection("사일런트 에임 설정")
 
-local ToggleSilentAvg = Tabs.Combat:AddToggle("SilentAim", {Title = "활성화", Default = false })
-ToggleSilentAvg:OnChanged(function(v) SilentSettings.Enabled = v end)
+local ToggleSilentAvg = Tabs.Combat:CreateToggle({
+    Name = "활성화", 
+    CurrentValue = false,
+    Callback = function(v) SilentSettings.Enabled = v end
+}, "SilentAim")
+Options.SilentAim = ToggleSilentAvg
 
-local ToggleFOV = Tabs.Combat:AddToggle("SilentAimFOV", {Title = "FOV 표시 (시야각 원)", Default = false })
-ToggleFOV:OnChanged(function(v) SilentSettings.ShowFOV = v; if FOVCircle then FOVCircle.Visible = v end end)
+local ToggleFOV = Tabs.Combat:CreateToggle({
+    Name = "FOV 표시 (시야각 원)", 
+    CurrentValue = false,
+    Callback = function(v) SilentSettings.ShowFOV = v; if FOVCircle then FOVCircle.Visible = v end end
+}, "SilentAimFOV")
+Options.SilentAimFOV = ToggleFOV
 
-Tabs.Combat:AddSlider("SilentAimRadius", {Title = "FOV 크기", Default = 180, Min = 10, Max = 800, Rounding = 0, Callback = function(v) SilentSettings.FOV = v; if FOVCircle then FOVCircle.Radius = v end end})
-Tabs.Combat:AddSlider("SilentAimHitChance", {Title = "명중 확률 (%)", Default = 100, Min = 0, Max = 100, Rounding = 0, Callback = function(v) SilentSettings.HitChance = v end})
+Tabs.Combat:CreateSlider({
+    Name = "FOV 크기",
+    Range = {10, 800},
+    Increment = 1,
+    CurrentValue = 180,
+    Callback = function(v) SilentSettings.FOV = tonumber(v); if FOVCircle then FOVCircle.Radius = tonumber(v) end end
+}, "SilentAimRadius")
 
-local DropdownPart = Tabs.Combat:AddDropdown("SilentAimPart", {Title = "타겟 부위", Values = {"Head", "HumanoidRootPart", "Random"}, Default = "Head", Multi = false, Callback = function(v) SilentSettings.TargetPart = v end})
+Tabs.Combat:CreateSlider({
+    Name = "명중 확률 (%)",
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 100,
+    Callback = function(v) SilentSettings.HitChance = tonumber(v) end
+}, "SilentAimHitChance")
+
+Tabs.Combat:CreateDropdown({
+    Name = "타겟 부위",
+    Options = {"Head", "HumanoidRootPart", "Random"},
+    CurrentOption = "Head",
+    MultipleOptions = false,
+    Callback = function(v) SilentSettings.TargetPart = v end
+}, "SilentAimPart")
 
 -- Detailed Settings
-local SilentDetailSection = Tabs.Combat:AddSection("사일런트 에임 세부 설정")
-Tabs.Combat:AddToggle("SilentSmart", {Title = "스마트 타겟팅", Description = "커서와 가장 가까운 뼈를 자동으로 조준합니다", Default = false }):OnChanged(function(v) SilentSettings.SmartTargeting = v end)
-Tabs.Combat:AddToggle("SilentVisible", {Title = "벽 구분 (보이는 적만)", Default = false }):OnChanged(function(v) SilentSettings.VisibleCheck = v end)
--- Tabs.Combat:AddToggle("SilentTeam", {Title = "팀 구분 (아군 제외)", Default = true }):OnChanged(function(v) SilentSettings.TeamCheck = v end) -- Removed as per request
-Tabs.Combat:AddSlider("SilentDist", {Title = "최대 사거리", Default = 1000, Min = 50, Max = 5000, Rounding = 0, Callback = function(v) SilentSettings.MaxDistance = v end})
-Tabs.Combat:AddToggle("SilentAutoFire", {Title = "자동 발사 (Auto Fire)", Default = false }):OnChanged(function(v) SilentSettings.AutoFire = v end)
+Tabs.Combat:CreateSection("사일런트 에임 세부 설정")
+
+Tabs.Combat:CreateToggle({
+    Name = "스마트 타겟팅",
+    Description = "커서와 가장 가까운 뼈를 자동으로 조준합니다",
+    CurrentValue = false,
+    Callback = function(v) SilentSettings.SmartTargeting = v end
+}, "SilentSmart")
+
+Tabs.Combat:CreateToggle({
+    Name = "벽 구분 (보이는 적만)",
+    CurrentValue = false,
+    Callback = function(v) SilentSettings.VisibleCheck = v end
+}, "SilentVisible")
+
+Tabs.Combat:CreateSlider({
+    Name = "최대 사거리",
+    Range = {50, 5000},
+    Increment = 10,
+    CurrentValue = 1000,
+    Callback = function(v) SilentSettings.MaxDistance = tonumber(v) end
+}, "SilentDist")
+
+Tabs.Combat:CreateToggle({
+    Name = "자동 발사 (Auto Fire)",
+    CurrentValue = false,
+    Callback = function(v) SilentSettings.AutoFire = v end
+}, "SilentAutoFire")
 
 -- [[ Silent Aim Functions ]] --
 local function GetClosestTarget()
@@ -798,7 +886,7 @@ end)
 -- [[ Legit Aimbot Logic ]] --
 local AimbotSettings = {
     Enabled = false,
-    Keybind = "RMS", 
+    Keybind = "MouseButton2", 
     VisibleCheck = true,
     TeamCheck = true,
     TargetPart = "Nearest", 
@@ -838,59 +926,161 @@ local AimbotSettings = {
     Prediction = false
 }
 
-local AimbotSection = Tabs.Combat:AddSection("레짓 에임봇 설정 (자연스러운 에임)")
+Tabs.Combat:CreateSection("레짓 에임봇 설정 (자연스러운 에임)")
 
-local AimToggle = Tabs.Combat:AddToggle("AimbotEnabled", {Title = "에임봇 활성화", Default = false })
-AimToggle:OnChanged(function(v) AimbotSettings.Enabled = v end)
+local AimToggle = Tabs.Combat:CreateToggle({
+    Name = "에임봇 활성화", 
+    CurrentValue = false,
+    Callback = function(v) AimbotSettings.Enabled = v end
+}, "AimbotEnabled")
+Options.AimbotEnabled = AimToggle
 
-local AimKey = Tabs.Combat:AddKeybind("AimbotKey", {
-    Title = "작동 키 (꾹 누르기)",
-    Mode = "Hold",
-    Default = "LeftAlt",
-    ChangedCallback = function(New) end
-})
+Tabs.Combat:CreateDropdown({
+    Name = "작동 키 (Keybind)",
+    Options = {"MouseButton2", "MouseButton1", "LeftAlt", "LeftControl", "LeftShift", "E", "Q", "R", "F", "C", "V", "X", "Z"},
+    CurrentOption = "MouseButton2",
+    MultipleOptions = false,
+    Callback = function(v) AimbotSettings.Keybind = v end
+}, "AimbotKeyDropdown")
 
 -- Targeting Config
-Tabs.Combat:AddDropdown("AimbotPart", {Title = "타겟 우선순위", Values = {"Head", "Random", "Nearest"}, Default = "Nearest", Multi = false, Callback = function(v) AimbotSettings.TargetPart = v end})
-Tabs.Combat:AddToggle("AimbotVisibleCheck", {Title = "벽 구분 (보이는 적만)", Default = true }):OnChanged(function(v) AimbotSettings.VisibleCheck = v end)
-Tabs.Combat:AddToggle("AimbotSticky", {Title = "Sticky Aim (라킹 유지)", Description = "타겟이 죽을 때까지 에임 고정", Default = false }):OnChanged(function(v) AimbotSettings.StickyAim = v end)
-Tabs.Combat:AddToggle("AimbotPrediction", {Title = "예측 (Prediction)", Default = false }):OnChanged(function(v) AimbotSettings.Prediction = v end)
-Tabs.Combat:AddSlider("AimbotPredAmt", {Title = "예측 강도", Default = 3, Min = 0, Max = 20, Rounding = 1, Callback = function(v) AimbotSettings.PredictionAmount = v end})
+Tabs.Combat:CreateDropdown({
+    Name = "타겟 우선순위",
+    Options = {"Head", "Random", "Nearest"},
+    CurrentOption = "Nearest",
+    MultipleOptions = false,
+    Callback = function(v) AimbotSettings.TargetPart = v end
+}, "AimbotPart")
+
+Tabs.Combat:CreateToggle({
+    Name = "벽 구분 (보이는 적만)",
+    CurrentValue = true,
+    Callback = function(v) AimbotSettings.VisibleCheck = v end
+}, "AimbotVisibleCheck")
+
+Tabs.Combat:CreateToggle({
+    Name = "Sticky Aim (라킹 유지)",
+    Description = "한번 조준된 타겟을 놓치지 않고 계속 추적합니다",
+    CurrentValue = false,
+    Callback = function(v) AimbotSettings.StickyAim = v end
+}, "AimbotSticky")
+
+Tabs.Combat:CreateToggle({
+    Name = "예측 (Prediction)",
+    CurrentValue = false,
+    Callback = function(v) AimbotSettings.Prediction = v end
+}, "AimbotPrediction")
+
+Tabs.Combat:CreateSlider({
+    Name = "예측 강도",
+    Range = {0, 20},
+    Increment = 1,
+    CurrentValue = 3,
+    Callback = function(v) AimbotSettings.PredictionAmount = tonumber(v) end
+}, "AimbotPredAmt")
 
 -- FOV Config
-local FOVSection = Tabs.Combat:AddSection("FOV (시야각) 설정")
-Tabs.Combat:AddSlider("AimbotFOV", {Title = "FOV 크기", Default = 100, Min = 10, Max = 800, Rounding = 0, Callback = function(v) AimbotSettings.FOV = v end})
-Tabs.Combat:AddToggle("AimbotDynamicFOV", {Title = "동적 FOV", Description = "적과의 거리에 따라 FOV를 자동으로 조절합니다", Default = false }):OnChanged(function(v) AimbotSettings.DynamicFOV = v end)
+Tabs.Combat:CreateSection("FOV (시야각) 설정")
+Tabs.Combat:CreateSlider({
+    Name = "FOV 크기",
+    Range = {10, 800},
+    Increment = 1,
+    CurrentValue = 100,
+    Callback = function(v) AimbotSettings.FOV = tonumber(v) end
+}, "AimbotFOV")
+
+Tabs.Combat:CreateToggle({
+    Name = "동적 FOV",
+    Description = "적과의 거리에 따라 FOV를 자동으로 조절합니다",
+    CurrentValue = false,
+    Callback = function(v) AimbotSettings.DynamicFOV = v end
+}, "AimbotDynamicFOV")
 
 -- Humanization Config
-local StyleSection = Tabs.Combat:AddSection("인간화 & 커브 설정")
+Tabs.Combat:CreateSection("인간화 & 커브 설정")
 
-Tabs.Combat:AddDropdown("AimStyle", {Title = "에임 스타일", Values = {"Mouse", "Spring", "Linear"}, Default = "Mouse", Multi = false, Callback = function(v) AimbotSettings.AimStyle = v end})
-Tabs.Combat:AddSlider("AimbotCurve", {Title = "마우스 커브 (곡선 이동)", Description = "에임이 직선이 아닌 곡선으로 이동하여 사람처럼 보입니다", Default = 1, Min = 0, Max = 10, Rounding = 1, Callback = function(v) AimbotSettings.CurveAmount = v end})
-Tabs.Combat:AddSlider("AimbotShake", {Title = "손떨림 효과", Description = "에임에 미세한 떨림을 추가합니다", Default = 0, Min = 0, Max = 10, Rounding = 1, Callback = function(v) AimbotSettings.ShakeAmount = v end})
+Tabs.Combat:CreateDropdown({
+    Name = "에임 스타일",
+    Options = {"Mouse", "Spring", "Linear"},
+    CurrentOption = "Mouse",
+    MultipleOptions = false,
+    Callback = function(v) AimbotSettings.AimStyle = v end
+}, "AimStyle")
 
-Tabs.Combat:AddSlider("AimbotSmooth", {Title = "부드러움 (Smoothing)", Default = 15, Min = 1, Max = 50, Rounding = 1, Callback = function(v) AimbotSettings.Smoothing = v end})
+Tabs.Combat:CreateSlider({
+    Name = "마우스 커브 (곡선 이동)",
+    Description = "에임이 직선이 아닌 곡선으로 이동하여 사람처럼 보입니다",
+    Range = {0, 10},
+    Increment = 1,
+    CurrentValue = 1,
+    Callback = function(v) AimbotSettings.CurveAmount = tonumber(v) end
+}, "AimbotCurve")
 
-Tabs.Combat:AddSlider("AimbotReaction", {Title = "반응 지연 (초)", Default = 0.15, Min = 0, Max = 0.5, Rounding = 2, Callback = function(v) AimbotSettings.ReactionDelay = v end})
+Tabs.Combat:CreateSlider({
+    Name = "손떨림 효과",
+    Description = "에임에 미세한 떨림을 추가합니다",
+    Range = {0, 10},
+    Increment = 1,
+    CurrentValue = 0,
+    Callback = function(v) AimbotSettings.ShakeAmount = tonumber(v) end
+}, "AimbotShake")
+
+Tabs.Combat:CreateSlider({
+    Name = "부드러움 (Smoothing)",
+    Range = {1, 50},
+    Increment = 1,
+    CurrentValue = 15,
+    Callback = function(v) AimbotSettings.Smoothing = tonumber(v) end
+}, "AimbotSmooth")
+
+Tabs.Combat:CreateSlider({
+    Name = "반응 지연 (초)",
+    Range = {0, 0.5},
+    Increment = 0.05,
+    CurrentValue = 0.15,
+    Callback = function(v) AimbotSettings.ReactionDelay = tonumber(v) end
+}, "AimbotReaction")
 
 -- TriggerBot Settings
 local TriggerBotSettings = {
     Enabled = false,
     Delay = 0.1,
     TeamCheck = true,
+    Keybind = "LeftAlt",
     LastFire = 0
 }
 
-local TriggerSection = Tabs.Combat:AddSection("트리거봇 (TriggerBot)")
-Tabs.Combat:AddToggle("TriggerBotEnabled", {Title = "활성화", Default = false }):OnChanged(function(v) TriggerBotSettings.Enabled = v end)
-Tabs.Combat:AddKeybind("TriggerBotKey", {
-    Title = "작동 키 (Hold)",
-    Mode = "Hold",
-    Default = "LeftAlt",
-    ChangedCallback = function(New) end
-})
-Tabs.Combat:AddSlider("TriggerBotDelay", {Title = "발사 지연", Default = 0.05, Min = 0, Max = 1, Rounding = 2, Callback = function(v) TriggerBotSettings.Delay = v end})
-Tabs.Combat:AddToggle("TriggerBotTeamCheck", {Title = "팀원 무시", Default = true }):OnChanged(function(v) TriggerBotSettings.TeamCheck = v end)
+Tabs.Combat:CreateSection("트리거봇 (TriggerBot)")
+
+Tabs.Combat:CreateToggle({
+    Name = "활성화",
+    CurrentValue = false,
+    Callback = function(v) TriggerBotSettings.Enabled = v end
+}, "TriggerBotEnabled")
+
+Tabs.Combat:CreateDropdown({
+    Name = "작동 키 (Keybind)",
+    Options = {"LeftAlt", "MouseButton2", "MouseButton1", "LeftControl", "LeftShift", "E", "Q", "R", "F", "C", "V", "X", "Z"},
+    CurrentOption = "LeftAlt",
+    MultipleOptions = false,
+    Callback = function(v) 
+        TriggerBotSettings.Keybind = v 
+    end
+}, "TriggerBotKeyDropdown")
+
+Tabs.Combat:CreateSlider({
+    Name = "발사 지연",
+    Range = {0, 1},
+    Increment = 0.05,
+    CurrentValue = 0.05,
+    Callback = function(v) TriggerBotSettings.Delay = tonumber(v) end
+}, "TriggerBotDelay")
+
+Tabs.Combat:CreateToggle({
+    Name = "팀원 무시",
+    CurrentValue = true,
+    Callback = function(v) TriggerBotSettings.TeamCheck = v end
+}, "TriggerBotTeamCheck")
 
 -- [[ Spring Module (Internal) ]] --
 local Spring = {}
@@ -949,7 +1139,7 @@ local function GetBestAimTarget()
             local root = p.Character:FindFirstChild("HumanoidRootPart")
             local hum = p.Character:FindFirstChild("Humanoid")
             if root and hum and hum.Health > 0 then
-                if AimbotSettings.TeamCheck and p.Team == LocalPlayer.Team then continue end
+                if AimbotSettings.TeamCheck and p.Team ~= nil and LocalPlayer.Team ~= nil and p.Team == LocalPlayer.Team then continue end
                 
                 local targetPartObj
                 if AimbotSettings.TargetPart == "Head" then targetPartObj = p.Character:FindFirstChild("Head")
@@ -1012,20 +1202,8 @@ RunService.RenderStepped:Connect(function(dt)
     -- 1. Aimbot Logic
     ---------------------------
     if AimbotSettings.Enabled then
-        local keyState = false
-        if Options.AimbotKey then
-             if Options.AimbotKey.GetState then keyState = Options.AimbotKey:GetState()
-             else
-                local keyName = Options.AimbotKey.Value
-                if keyName then
-                    if keyName:find("MouseButton1") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-                    elseif keyName:find("MouseButton2") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-                    else
-                        local success, keyCode = pcall(function() return Enum.KeyCode[keyName] end)
-                        if success and keyCode then keyState = UserInputService:IsKeyDown(keyCode) end
-                    end
-                end
-             end
+        if AimbotSettings.Keybind then
+             keyState = IsKeyDown(AimbotSettings.Keybind)
         end
 
         if keyState then
@@ -1107,7 +1285,11 @@ RunService.RenderStepped:Connect(function(dt)
                               if mousemoverel then
                                   mousemoverel(delta.X, delta.Y)
                               else
-                                  -- Fallback
+                                  -- Fallback for executors without mousemoverel
+                                  local currentCam = workspace.CurrentCamera
+                                  local lookVector = (goalPosition - currentCam.CFrame.Position).Unit
+                                  local newFrame = CFrame.new(currentCam.CFrame.Position, currentCam.CFrame.Position + lookVector)
+                                  currentCam.CFrame = currentCam.CFrame:Lerp(newFrame, 0.5) -- Smooth camera movement as fallback
                               end
                          end
                      end
@@ -1125,20 +1307,8 @@ RunService.RenderStepped:Connect(function(dt)
     -- 2. TriggerBot Logic
     ---------------------------
     if TriggerBotSettings.Enabled then
-        local keyState = false
-        if Options.TriggerBotKey then
-             if Options.TriggerBotKey.GetState then keyState = Options.TriggerBotKey:GetState()
-             else
-                local keyName = Options.TriggerBotKey.Value
-                if keyName then
-                    if keyName:find("MouseButton1") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
-                    elseif keyName:find("MouseButton2") then keyState = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-                    else
-                        local success, keyCode = pcall(function() return Enum.KeyCode[keyName] end)
-                        if success and keyCode then keyState = UserInputService:IsKeyDown(keyCode) end
-                    end
-                end
-             end
+        if TriggerBotSettings.Keybind then
+            keyState = IsKeyDown(TriggerBotSettings.Keybind)
         end
 
         if keyState then
@@ -1184,9 +1354,7 @@ RunService.RenderStepped:Connect(function(dt)
              end
          end
     end
-end)
-
--- [[ Attribute Logic with Caching ]] --
+end)-- [[ Attribute Logic with Caching ]] --
 local AttributeCache = setmetatable({}, { __mode = "k" })
 local TargetTables = {} -- Cache for tables that contain our interested attributes
 
@@ -1255,33 +1423,45 @@ end
 -- // Combat Features //
 
 -- [[ Gun Mods ]] --
--- [[ Gun Mods ]] --
-local GunMods = Tabs.Combat:AddSection("총기 설정")
+Tabs.Combat:CreateSection("총기 설정")
 
-local NoRecoil = Tabs.Combat:AddToggle("NoRecoil", {Title = "무반동 (No Recoil)", Default = false })
-local NoSpread = Tabs.Combat:AddToggle("NoSpread", {Title = "무탄퍼짐 (No Spread)", Default = false })
-local NoMuzzle = Tabs.Combat:AddToggle("NoMuzzle", {Title = "총구 섬광 제거 (No Muzzle)", Default = false })
+local NoRecoil = Tabs.Combat:CreateToggle({
+    Name = "무반동 (No Recoil)",
+    CurrentValue = false,
+    Callback = function(v) end
+}, "NoRecoil")
+Options.NoRecoil = NoRecoil
 
-local GunCooldown = Tabs.Combat:AddSlider("GunCooldown", {
-    Title = "공격 쿨타임",
+local NoSpread = Tabs.Combat:CreateToggle({
+    Name = "무탄퍼짐 (No Spread)",
+    CurrentValue = false,
+    Callback = function(v) end
+}, "NoSpread")
+Options.NoSpread = NoSpread
+
+local NoMuzzle = Tabs.Combat:CreateToggle({
+    Name = "총구 섬광 제거 (No Muzzle)",
+    CurrentValue = false,
+    Callback = function(v) end
+}, "NoMuzzle")
+Options.NoMuzzle = NoMuzzle
+
+Tabs.Combat:CreateSlider({
+    Name = "공격 쿨타임",
     Description = "총기 발사 딜레이를 줄입니다 (0% = 즉시 발사)",
-    Default = 100,
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 100,
     Callback = function(Value)
         ModPercentage("ShootCooldown", Value)
         ModPercentage("ShootBurstCooldown", Value)
         ModPercentage("QuickShotCooldown", Value)
         ModPercentage("GlobalCooldown", Value)
     end
-})
+}, "GunCooldown")
 
--- [[ Misc Combat ]] --
--- Removed from Combat Tab to separate Tab below
-
-NoRecoil:OnChanged(function()
-    local val = Options.NoRecoil.Value
+NoRecoil.Callback = function(Value)
+    local val = Value
     if val then
         ModAttribute("ShootRecoil", 0)
         ModAttribute("RecoilShake", 0)
@@ -1294,10 +1474,10 @@ NoRecoil:OnChanged(function()
              if attrs["CameraShake"] ~= nil then t.CameraShake = attrs.CameraShake end
         end
     end
-end)
+end
 
-NoSpread:OnChanged(function()
-    local val = Options.NoSpread.Value
+NoSpread.Callback = function(Value)
+    local val = Value
     if val then
         ModAttribute("ShootSpread", 0)
         ModAttribute("AimSpreadMultiplier", 0)
@@ -1310,10 +1490,10 @@ NoSpread:OnChanged(function()
              if attrs["ShootAccuracy"] ~= nil then t.ShootAccuracy = attrs.ShootAccuracy end
         end
     end
-end)
+end
 
-NoMuzzle:OnChanged(function()
-    local val = Options.NoMuzzle.Value
+NoMuzzle.Callback = function(Value)
+    local val = Value
     if val then
         ModAttribute("MuzzleFlash", false)
         ModAttribute("FlashEnabled", false)
@@ -1323,15 +1503,14 @@ NoMuzzle:OnChanged(function()
              if attrs["FlashEnabled"] ~= nil then t.FlashEnabled = attrs.FlashEnabled end
         end
     end
-end)
+end
 
 -- Unified RenderStepped Loop for Combat Mods
--- Ensures values are constantly enforced without laggy getgc scans
 local RunService = game:GetService("RunService")
 RunService.RenderStepped:Connect(function()
-    local noRecoil = Options.NoRecoil and Options.NoRecoil.Value
-    local noSpread = Options.NoSpread and Options.NoSpread.Value
-    local noMuzzle = Options.NoMuzzle and Options.NoMuzzle.Value
+    local noRecoil = Options.NoRecoil and Options.NoRecoil.CurrentValue
+    local noSpread = Options.NoSpread and Options.NoSpread.CurrentValue
+    local noMuzzle = Options.NoMuzzle and Options.NoMuzzle.CurrentValue
 
     -- If no features are enabled, don't iterate at all
     if not (noRecoil or noSpread or noMuzzle) then return end
@@ -1364,35 +1543,44 @@ end)
 
 -- [[ Melee Mods ]] --
 -- [[ Melee Mods ]] --
-local MeleeMods = Tabs.Combat:AddSection("근접 무기 설정")
+Tabs.Combat:CreateSection("근접 무기 설정")
 
-local MeleeAura = Tabs.Combat:AddToggle("MeleeAura", {Title = "근접 오라 (범위 증가)", Default = false })
-local TeleportAura = Tabs.Combat:AddToggle("TeleportAura", {Title = "타겟 추적 (순간이동)", Default = false })
+local MeleeAura = Tabs.Combat:CreateToggle({
+    Name = "근접 오라 (범위 증가)",
+    CurrentValue = false,
+    Callback = function(v) end
+}, "MeleeAura")
+Options.MeleeAura = MeleeAura
 
-local MeleeCooldown = Tabs.Combat:AddSlider("MeleeCooldown", {
-    Title = "공격 쿨타임",
+local TeleportAura = Tabs.Combat:CreateToggle({
+    Name = "타겟 추적 (순간이동)",
+    CurrentValue = false,
+    Callback = function(v) end
+}, "TeleportAura")
+Options.TeleportAura = TeleportAura
+
+Tabs.Combat:CreateSlider({
+    Name = "공격 쿨타임",
     Description = "근접 공격 및 스킬 딜레이를 줄입니다",
-    Default = 100,
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 100,
     Callback = function(Value)
         ModPercentage("AttackCooldown", Value)
         ModPercentage("HeavyAttackCooldown", Value)
         ModPercentage("BladeCooldown", Value)
     end
-})
+}, "MeleeCooldown")
 
 -- [[ Skill Mods ]] --
-local SkillMods = Tabs.Combat:AddSection("스킬 설정")
+Tabs.Combat:CreateSection("스킬 설정")
 
-local SkillCooldown = Tabs.Combat:AddSlider("SkillCooldown", {
-    Title = "스킬 쿨타임",
+Tabs.Combat:CreateSlider({
+    Name = "스킬 쿨타임",
     Description = "특수 능력 (대시, 회전 등)의 딜레이를 줄입니다",
-    Default = 100,
-    Min = 0,
-    Max = 100,
-    Rounding = 1,
+    Range = {0, 100},
+    Increment = 1,
+    CurrentValue = 100,
     Callback = function(Value)
         ModPercentage("DashCooldown", Value)
         ModPercentage("DeflectCooldown", Value)
@@ -1401,14 +1589,14 @@ local SkillCooldown = Tabs.Combat:AddSlider("SkillCooldown", {
         ModPercentage("AirblastCooldown", Value)
         ModPercentage("VortexCooldown", Value)
     end
-})
+}, "SkillCooldown")
 
 -- Melee/TP Aura Logic
 RunService.Heartbeat:Connect(function()
     local LocalPlayer = game:GetService("Players").LocalPlayer
     if not LocalPlayer.Character then return end
     
-    if Options.MeleeAura.Value then
+    if Options.MeleeAura and Options.MeleeAura.CurrentValue then
         -- Expand Hitboxes / Reach
         ModAttribute("HitboxSize", 20)
         ModAttribute("Radius", 20)
@@ -1418,7 +1606,7 @@ RunService.Heartbeat:Connect(function()
          -- For loop logic, we just rely on ModAttribute caching original first time.
     end
 
-    if Options.TeleportAura.Value then
+    if Options.TeleportAura and Options.TeleportAura.CurrentValue then
         local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then
 
@@ -1457,45 +1645,60 @@ end)
 
 -- // Movement Features //
 
-local WalkSpeed = Tabs.Movement:AddSlider("WalkSpeed", {
-    Title = "이동 속도 (WalkSpeed)",
+-- [[ Movement Features ]] --
+
+local WalkSpeed = Tabs.Movement:CreateSlider({
+    Name = "이동 속도 (WalkSpeed)",
     Description = "캐릭터의 이동 속도를 조절합니다",
-    Default = 16,
-    Min = 16,
-    Max = 1000,
-    Rounding = 1,
+    Range = {16, 1000},
+    Increment = 1,
+    CurrentValue = 16,
     Callback = function(Value) end
-})
+}, "WalkSpeed")
+Options.WalkSpeed = WalkSpeed
 
-local JumpPower = Tabs.Movement:AddSlider("JumpPower", {
-    Title = "점프력 (JumpPower)",
+local JumpPower = Tabs.Movement:CreateSlider({
+    Name = "점프력 (JumpPower)",
     Description = "점프 높이를 조절합니다",
-    Default = 50,
-    Min = 50,
-    Max = 1000,
-    Rounding = 1,
+    Range = {50, 1000},
+    Increment = 1,
+    CurrentValue = 50,
     Callback = function(Value) end
-})
+}, "JumpPower")
+Options.JumpPower = JumpPower
 
-local InfiniteJump = Tabs.Movement:AddToggle("InfiniteJump", {Title = "무한 점프", Default = false })
-local Noclip = Tabs.Movement:AddToggle("Noclip", {Title = "노클립 (벽 통과)", Default = false })
-local Fly = Tabs.Movement:AddToggle("Fly", {Title = "비행 (Fly)", Default = false })
-local FlySpeed = Tabs.Movement:AddSlider("FlySpeed", {
-    Title = "비행 속도",
+local InfiniteJump = Tabs.Movement:CreateToggle({
+    Name = "무한 점프", 
+    CurrentValue = false,
+    Callback = function(v) end
+}, "InfiniteJump")
+Options.InfiniteJump = InfiniteJump
+
+local Noclip = Tabs.Movement:CreateToggle({
+    Name = "노클립 (벽 통과)", 
+    CurrentValue = false,
+    Callback = function(v) end
+}, "Noclip")
+Options.Noclip = Noclip
+
+local Fly = Tabs.Movement:CreateToggle({
+    Name = "비행 (Fly)", 
+    CurrentValue = false,
+    Callback = function(v) end
+}, "Fly")
+Options.Fly = Fly
+
+local FlySpeed = Tabs.Movement:CreateSlider({
+    Name = "비행 속도",
     Description = "비행 시 이동 속도를 조절합니다",
-    Default = 50,
-    Min = 10,
-    Max = 1000,
-    Rounding = 1,
+    Range = {10, 1000},
+    Increment = 1,
+    CurrentValue = 50,
     Callback = function(Value) end
-})
+}, "FlySpeed")
+Options.FlySpeed = FlySpeed
 
 -- // Movement Logic //
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
 
 local function GetRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -1513,7 +1716,7 @@ local flyBodyGyro, flyBodyVelocity
 RunService.Heartbeat:Connect(function(deltaTime)
     if not LocalPlayer.Character then return end
     
-    local speedVal = tonumber(Options.WalkSpeed.Value) or 16
+    local speedVal = (Options.WalkSpeed and tonumber(Options.WalkSpeed.CurrentValue)) or 16
     if speedVal > 16 then
         local hum = GetHumanoid()
         local root = GetRoot()
@@ -1528,8 +1731,8 @@ end)
 UserInputService.JumpRequest:Connect(function()
     if not LocalPlayer.Character then return end
     
-    local jpVal = tonumber(Options.JumpPower.Value) or 50
-    local infJump = Options.InfiniteJump.Value
+    local jpVal = (Options.JumpPower and tonumber(Options.JumpPower.CurrentValue)) or 50
+    local infJump = Options.InfiniteJump and Options.InfiniteJump.CurrentValue
     local hum = GetHumanoid()
     local root = GetRoot()
     
@@ -1551,7 +1754,7 @@ RunService.Stepped:Connect(function()
     if not char then return end
 
     -- Noclip
-    if Options.Noclip.Value then
+    if Options.Noclip and Options.Noclip.CurrentValue then
         for _, v in pairs(char:GetChildren()) do
             if v:IsA("BasePart") and v.CanCollide then
                 v.CanCollide = false
@@ -1560,7 +1763,7 @@ RunService.Stepped:Connect(function()
     end
     
     -- Fly
-    if Options.Fly.Value then
+    if Options.Fly and Options.Fly.CurrentValue then
         local root = GetRoot()
         local hum = GetHumanoid()
         
@@ -1582,7 +1785,7 @@ RunService.Stepped:Connect(function()
                 hum.PlatformStand = true
             end
             
-            local flySpd = tonumber(Options.FlySpeed.Value) or 50
+            local flySpd = (Options.FlySpeed and tonumber(Options.FlySpeed.CurrentValue)) or 50
             flyBodyGyro.cframe = Camera.CFrame
             
             local vel = Vector3.new(0,0,0)
@@ -1591,6 +1794,22 @@ RunService.Stepped:Connect(function()
             end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) then
                 vel = vel - Camera.CFrame.LookVector * flySpd
+            end
+            local function IsKeyDown(bindName)
+                if not bindName or bindName == "None" or bindName == "Unknown" then return false end
+                
+                local name = tostring(bindName)
+                if name == "MouseButton1" or name == "MB1" or name == "LMB" then
+                    return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                elseif name == "MouseButton2" or name == "MB2" or name == "RMB" then
+                    return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+                else
+                    local success, key = pcall(function() return Enum.KeyCode[name] end)
+                    if success and key then
+                        return UserInputService:IsKeyDown(key)
+                    end
+                end
+                return false
             end
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then
                 vel = vel + Camera.CFrame.RightVector * flySpd
@@ -1628,22 +1847,19 @@ RunService.Stepped:Connect(function()
 end)
 
 -- // Managers Setup //
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
 
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
+-- Config Tab (Required for Autoload)
+Tabs.Settings:BuildConfigSection()
+Tabs.Settings:BuildThemeSection()
 
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-SaveManager:BuildConfigSection(Tabs.Settings)
+Luna:LoadAutoloadConfig()
 
-Window:SelectTab(1)
-
-Fluent:Notify({
+Luna:Notification({
     Title = "Neogul Rivals",
     Content = "Script Loaded Successfully!",
-    Duration = 5
+    Icon = "check-circle",
+    ImageSource = "Lucide"
 })
 
 -- // Cleanup //
-SaveManager:LoadAutoloadConfig()
+-- Luna handles destroy callback generally in library
