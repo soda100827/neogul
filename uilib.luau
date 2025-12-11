@@ -3898,7 +3898,7 @@ function library:Init(key)
     
     -- Watermark Logic
     local watermark = nil
-    Settings:NewToggle("Show Watermark", true, function(state)
+    Settings:NewToggle("Show Watermark", false, function(state)
         if state then
             if not watermark then
                 watermark = library:CreateWatermark()
