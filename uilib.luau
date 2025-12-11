@@ -100,6 +100,69 @@ function library:CheckIfLoaded()
     end
 end
 
+function library:CreateWatermark(name, position)
+    local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+    local watermark = Instance.new("ScreenGui")
+    local watermarkFrame = Instance.new("Frame")
+    local watermarkGradient = Instance.new("UIGradient")
+    local watermarkCorner = Instance.new("UICorner")
+    local watermarkLabel = Instance.new("TextLabel")
+    local watermarkPadding = Instance.new("UIPadding")
+    
+    watermark.Name = "Watermark"
+    watermark.ResetOnSpawn = false
+    watermark.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    watermark.Parent = CoreGuiService
+    
+    watermarkFrame.Name = "watermarkFrame"
+    watermarkFrame.Parent = watermark
+    watermarkFrame.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
+    watermarkFrame.Position = position or UDim2.new(0.01, 0, 0.01, 0)
+    watermarkFrame.Size = UDim2.new(0, 0, 0, 26) -- Auto sized
+    
+    watermarkGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))}
+    watermarkGradient.Rotation = 90
+    watermarkGradient.Name = "watermarkGradient"
+    watermarkGradient.Parent = watermarkFrame
+    
+    watermarkCorner.CornerRadius = UDim.new(0, 4)
+    watermarkCorner.Name = "watermarkCorner"
+    watermarkCorner.Parent = watermarkFrame
+    
+    watermarkLabel.Name = "watermarkLabel"
+    watermarkLabel.Parent = watermarkFrame
+    watermarkLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    watermarkLabel.BackgroundTransparency = 1.000
+    watermarkLabel.Size = UDim2.new(1, 0, 1, 0)
+    watermarkLabel.Font = Enum.Font.Code
+    watermarkLabel.Text = name or "neogul.lua | "..gamename.." | "..library.fps.." FPS"
+    watermarkLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    watermarkLabel.TextSize = 14.000
+    watermarkLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    watermarkPadding.Name = "watermarkPadding"
+    watermarkPadding.Parent = watermarkFrame
+    watermarkPadding.PaddingLeft = UDim.new(0, 8)
+    watermarkPadding.PaddingRight = UDim.new(0, 8)
+    
+    -- Auto Size
+    local textSize = TextService:GetTextSize(watermarkLabel.Text, watermarkLabel.TextSize, watermarkLabel.Font, Vector2.new(math.huge, math.huge))
+    watermarkFrame.Size = UDim2.new(0, textSize.X + 18, 0, 26)
+    
+    -- Dragging
+    drag(watermarkFrame)
+    
+    -- Update FPS
+    RunService.RenderStepped:Connect(function(v)
+        library.fps = math.round(1/v)
+        watermarkLabel.Text = name or "neogul.lua | "..gamename.." | "..library.fps.." FPS"
+        local newSize = TextService:GetTextSize(watermarkLabel.Text, watermarkLabel.TextSize, watermarkLabel.Font, Vector2.new(math.huge, math.huge))
+        watermarkFrame.Size = UDim2.new(0, newSize.X + 18, 0, 26) 
+    end)
+    
+    return watermark
+end
+
 function library:GetUserId()
     return Player.UserId
 end
@@ -2075,16 +2138,26 @@ function library:Init(key)
             -- Context Menu for Mode Selection
             local contextMenu = Instance.new("Frame")
             local contextLayout = Instance.new("UIListLayout")
+            local contextCorner = Instance.new("UICorner")
+            local contextGradient = Instance.new("UIGradient")
             
             contextMenu.Name = "ContextMenu"
-            contextMenu.Parent = keybindFrame
-            contextMenu.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            contextMenu.Parent = keybindFrame -- Parent to keybindFrame to act as popup
+            contextMenu.BackgroundColor3 = Color3.fromRGB(45, 45, 45) -- Fallback
             contextMenu.BorderSizePixel = 0
             contextMenu.Size = UDim2.new(0, 100, 0, 0)
-            contextMenu.Position = UDim2.new(1, -110, 0, 0)
+            -- Position to the right of the keybind button, slightly overlapping or adjacent
+            contextMenu.Position = UDim2.new(1, -105, 1, 5) -- Below and aligned right
             contextMenu.Visible = false
             contextMenu.ClipsDescendants = true
-            contextMenu.ZIndex = 10
+            contextMenu.ZIndex = 20
+            
+            contextCorner.CornerRadius = UDim.new(0, 4)
+            contextCorner.Parent = contextMenu
+            
+            contextGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))}
+            contextGradient.Rotation = 90
+            contextGradient.Parent = contextMenu
             
             contextLayout.Parent = contextMenu
             contextLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -2095,28 +2168,36 @@ function library:Init(key)
                 modeBtn.Name = mode
                 modeBtn.Parent = contextMenu
                 modeBtn.Size = UDim2.new(1, 0, 0, 24)
-                modeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                modeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                modeBtn.BackgroundTransparency = 1
                 modeBtn.BorderSizePixel = 0
                 modeBtn.Text = mode
                 modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
                 modeBtn.Font = Enum.Font.Code
                 modeBtn.TextSize = 13
                 modeBtn.AutoButtonColor = false
+                modeBtn.ZIndex = 21
                 
                 if mode == keybindMode then
                     modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
                 end
                 
                 modeBtn.MouseEnter:Connect(function()
-                    modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                    modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
                 end)
                 modeBtn.MouseLeave:Connect(function()
-                     modeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                     if mode ~= keybindMode then
+                        modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
+                     else
+                        modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
+                     end
                 end)
                 
                 modeBtn.MouseButton1Click:Connect(function()
                     keybindMode = mode
-                    contextMenu.Visible = false
+                    contextMenu.Visible = false 
+                    contextMenu.Size = UDim2.new(0, 100, 0, 0) -- Reset size for animation
+                    
                     -- Reset text colors
                     for _, child in pairs(contextMenu:GetChildren()) do
                         if child:IsA("TextButton") then
@@ -2129,23 +2210,55 @@ function library:Init(key)
                 end)
             end
             
-            -- Right Click to Open Context Menu
-            keybindButton.MouseButton2Click:Connect(function()
+            local function toggleContextMenu()
                 contextMenu.Visible = not contextMenu.Visible
-                 if contextMenu.Visible then
+                if contextMenu.Visible then
                     contextMenu:TweenSize(UDim2.new(0, 100, 0, 24 * 3), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
-                 else
+                else
                     contextMenu:TweenSize(UDim2.new(0, 100, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
-                 end
-            end)
-            
-            keybind.MouseButton2Click:Connect(function()
-                 contextMenu.Visible = not contextMenu.Visible
-                 if contextMenu.Visible then
-                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 24 * 3), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
-                 else
-                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
-                 end
+                end
+            end
+
+            -- Right Click to Open Context Menu
+            keybindButton.MouseButton2Click:Connect(toggleContextMenu)
+            keybind.MouseButton2Click:Connect(toggleContextMenu)
+
+            -- Close when clicking outside
+            UserInputService.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    if contextMenu.Visible then
+                         -- Check if mouse is over the context menu
+                         local mousePos = UserInputService:GetMouseLocation()
+                         local menuPos = contextMenu.AbsolutePosition
+                         local menuSize = contextMenu.AbsoluteSize
+                         
+                         -- Also check if over the button itself to prevent immediate re-opening if handled there (though event order usually matters)
+                         -- But main goal: if clicked elsewhere.
+                         
+                         local inX = mousePos.X >= menuPos.X and mousePos.X <= (menuPos.X + menuSize.X)
+                         local inY = mousePos.Y >= (menuPos.Y + 36) and mousePos.Y <= (menuPos.Y + menuSize.Y + 36) -- +36 for generic GUI inset topbar compensation if using GetMouseLocation vs Input Object Position
+                         
+                        -- A simpler way using generic IsMouseOver if available, but manual math is safer for CoreGui
+                         -- Let's try to match logic strictly.
+                         -- Note: GetMouseLocation includes GUI Inset (top bar). AbsolutePosition does not (usually).
+                         -- Actually, let's just use a simple robust check:
+                         -- If the input object position is NOT inside the frame.
+                         
+                         -- Wait, InputBegan provides input object. input.Position is available.
+                         local pos = input.Position
+                         if not (pos.X >= menuPos.X and pos.X <= menuPos.X + menuSize.X and pos.Y >= menuPos.Y and pos.Y <= menuPos.Y + menuSize.Y) then
+                             -- Check if we are clicking the button itself (to allow toggle logic to handle it, prevent double toggle)
+                             local btnPos = keybindButton.AbsolutePosition
+                             local btnSize = keybindButton.AbsoluteSize
+                             local onBtn = (pos.X >= btnPos.X and pos.X <= btnPos.X + btnSize.X and pos.Y >= btnPos.Y and pos.Y <= btnPos.Y + btnSize.Y)
+                             
+                             if not onBtn then
+                                 contextMenu.Visible = false
+                                 contextMenu.Size = UDim2.new(0, 100, 0, 0)
+                             end
+                         end
+                    end
+                end
             end)
 
             if UserInputService.WindowFocused then
@@ -3700,10 +3813,19 @@ function library:Init(key)
     end)
     
     Settings:NewSection("Visuals")
+    
+    -- Watermark Logic
+    local watermark = nil
     Settings:NewToggle("Show Watermark", true, function(state)
-        -- Logic to toggle watermark visibility if watermark object is accessible
-        if CoreGuiService:FindFirstChild("watermark") then
-             CoreGuiService.watermark.Enabled = state
+        if state then
+            if not watermark then
+                watermark = library:CreateWatermark()
+            end
+            watermark.Enabled = true
+        else
+            if watermark then
+                watermark.Enabled = false
+            end
         end
     end)
 
