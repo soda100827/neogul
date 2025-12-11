@@ -101,6 +101,13 @@ end
 
 function library:CreateWatermark(name, position)
     local gamename = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
+    
+    for i,v in pairs(CoreGuiService:GetChildren()) do
+        if v.Name == "Watermark" or v.Name == "watermark" then
+            v:Destroy()
+        end
+    end
+
     local watermark = Instance.new("ScreenGui")
     local watermarkFrame = Instance.new("Frame")
     local watermarkGradient = Instance.new("UIGradient")
@@ -252,7 +259,7 @@ end
 
 function library:Watermark(text)
     for i,v in pairs(CoreGuiService:GetChildren()) do
-        if v.Name == "watermark" then
+        if v.Name == "watermark" or v.Name == "Watermark" then
             v:Destroy()
         end
     end
@@ -275,7 +282,7 @@ function library:Watermark(text)
     local waterPadding = Instance.new("UIPadding")
     local backgroundLayout = Instance.new("UIListLayout")
 
-    watermark.Name = "watermark"
+    watermark.Name = "Watermark"
     watermark.Parent = CoreGuiService
     watermark.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
@@ -510,7 +517,7 @@ function library:Watermark(text)
         end
         --
         function NewWatermarkFunctions:Remove()
-            Watermark:Destroy()
+            watermark:Destroy()
             return NewWatermarkFunctions
         end
         return NewWatermarkFunctions
@@ -542,7 +549,7 @@ function library:Watermark(text)
     end
     --
     function WatermarkFunctions:Remove()
-        Watermark:Destroy()
+        watermark:Destroy()
         return WatermarkFunctions
     end
     return WatermarkFunctions
@@ -2060,7 +2067,7 @@ function library:Init(key)
                                 end
                             end
                         end
-                    })
+                    end)
                     UserInputService.InputEnded:Connect(function(c, p)
                          if not p then
                              if c.KeyCode.Name == ChosenKey and keybindMode == "Hold" then
@@ -2068,7 +2075,7 @@ function library:Init(key)
                                  UpdateToggleState()
                              end
                          end
-                    })
+                    end)
                 end
                 
                 -- Always Mode Handling (Simple loop/check)
