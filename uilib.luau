@@ -1,5 +1,4 @@
 -- / Locals
-local Workspace = game:GetService("Workspace")
 local Player = game:GetService("Players").LocalPlayer
 local Mouse = Player:GetMouse()
 
@@ -9,7 +8,6 @@ local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGuiService = game:GetService("CoreGui")
-local ContentService = game:GetService("ContentProvider")
 local TeleportService = game:GetService("TeleportService")
 
 -- / Tween table & function
