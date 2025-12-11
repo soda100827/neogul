@@ -1103,6 +1103,143 @@ function library:Init(key)
         tabButton.TextSize = 15.000
         tabButton.RichText = true
 
+        -- Helper for Context Menu
+        local function CreateContextMenu(parentButton, currentMode, updateModeFunc)
+            local contextMenu = Instance.new("Frame")
+            local contextLayout = Instance.new("UIListLayout")
+            local contextCorner = Instance.new("UICorner")
+            local contextPadding = Instance.new("UIPadding")
+            local contextStroke = Instance.new("UIStroke")
+
+            contextMenu.Name = "ContextMenu"
+            contextMenu.Parent = screen
+            contextMenu.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+            contextMenu.BorderSizePixel = 0
+            contextMenu.Size = UDim2.new(0, 110, 0, 0)
+            contextMenu.Visible = false
+            contextMenu.ClipsDescendants = true
+            contextMenu.ZIndex = 50
+
+            -- Visuals
+            contextCorner.CornerRadius = UDim.new(0, 4)
+            contextCorner.Parent = contextMenu
+            
+            contextStroke.Color = Color3.fromRGB(60, 60, 60)
+            contextStroke.Thickness = 1
+            contextStroke.Parent = contextMenu
+
+            contextLayout.Parent = contextMenu
+            contextLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            contextLayout.Padding = UDim.new(0, 2)
+            
+            contextPadding.Parent = contextMenu
+            contextPadding.PaddingTop = UDim.new(0, 4)
+            contextPadding.PaddingBottom = UDim.new(0, 4)
+            contextPadding.PaddingLeft = UDim.new(0, 4)
+            contextPadding.PaddingRight = UDim.new(0, 4)
+
+            local modes = {"Toggle", "Hold", "Always"}
+            for _, mode in ipairs(modes) do
+                local modeBtn = Instance.new("TextButton")
+                local modeCorner = Instance.new("UICorner")
+                
+                modeBtn.Name = mode
+                modeBtn.Parent = contextMenu
+                modeBtn.Size = UDim2.new(1, 0, 0, 22)
+                modeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                modeBtn.BackgroundTransparency = 1
+                modeBtn.Text = mode
+                modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
+                modeBtn.Font = Enum.Font.Code
+                modeBtn.TextSize = 13
+                modeBtn.AutoButtonColor = false
+                modeBtn.ZIndex = 51
+
+                modeCorner.CornerRadius = UDim.new(0, 2)
+                modeCorner.Parent = modeBtn
+
+                if mode == currentMode then
+                    modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
+                    modeBtn.BackgroundTransparency = 0.95
+                end
+
+                modeBtn.MouseEnter:Connect(function()
+                    modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    modeBtn.BackgroundTransparency = 0.9
+                end)
+                modeBtn.MouseLeave:Connect(function()
+                     if mode ~= currentMode then
+                        modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
+                        modeBtn.BackgroundTransparency = 1
+                     else
+                        modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
+                        modeBtn.BackgroundTransparency = 0.95
+                     end
+                end)
+
+                modeBtn.MouseButton1Click:Connect(function()
+                    currentMode = mode
+                    contextMenu.Visible = false
+                    contextMenu.Size = UDim2.new(0, 110, 0, 0)
+                    
+                    for _, child in pairs(contextMenu:GetChildren()) do
+                        if child:IsA("TextButton") then
+                            child.TextColor3 = Color3.fromRGB(190, 190, 190)
+                            child.BackgroundTransparency = 1
+                        end
+                    end
+                    modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
+                    modeBtn.BackgroundTransparency = 0.95
+                    
+                    updateModeFunc(mode)
+                end)
+            end
+
+            -- Toggle Logic
+            local function toggleContextMenu()
+                contextMenu.Visible = not contextMenu.Visible
+                if contextMenu.Visible then
+                    local btnPos = parentButton.AbsolutePosition
+                    contextMenu.Position = UDim2.new(0, btnPos.X + parentButton.AbsoluteSize.X + 6, 0, btnPos.Y)
+                    contextMenu:TweenSize(UDim2.new(0, 110, 0, 26 * 3 + 6), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+                else
+                    contextMenu:TweenSize(UDim2.new(0, 110, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+                end
+            end
+            
+            parentButton.MouseButton2Click:Connect(toggleContextMenu)
+
+            -- Cleanup
+            parentButton.AncestryChanged:Connect(function()
+                if not parentButton:IsDescendantOf(game) then
+                    contextMenu:Destroy()
+                end
+            end)
+
+            -- Close on Click Outside
+            UserInputService.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    if contextMenu.Visible then
+                        local mousePos = UserInputService:GetMouseLocation()
+                        local menuPos = contextMenu.AbsolutePosition
+                        local menuSize = contextMenu.AbsoluteSize
+                        local btnPos = parentButton.AbsolutePosition
+                        local btnSize = parentButton.AbsoluteSize
+
+                        local inMenu = (mousePos.X >= menuPos.X and mousePos.X <= (menuPos.X + menuSize.X) and mousePos.Y >= (menuPos.Y + 36) and mousePos.Y <= (menuPos.Y + menuSize.Y + 36))
+                        local inBtn = (mousePos.X >= btnPos.X and mousePos.X <= (btnPos.X + btnSize.X) and mousePos.Y >= (btnPos.Y + 36) and mousePos.Y <= (btnPos.Y + btnSize.Y + 36))
+
+                        if not inMenu and not inBtn then
+                            contextMenu.Visible = false
+                            contextMenu.Size = UDim2.new(0, 110, 0, 0)
+                        end
+                    end
+                end
+            end)
+            
+            return contextMenu
+        end
+
         page.Name = "page"
         page.Parent = container
         page.Active = true
@@ -1887,32 +2024,67 @@ function library:Init(key)
                 UpdatePageSize()
     
                 local ChosenKey = default_t.Name
-    
+                local keybindMode = "Toggle"
+
                 keybind.MouseButton1Click:Connect(function()
                     keybindButtonLabel.Text = ". . ."
                     local InputWait = UserInputService.InputBegan:wait()
                     if UserInputService.WindowFocused and InputWait.KeyCode.Name ~= "Unknown" then
                         local Result = Shortcuts[InputWait.KeyCode.Name] or InputWait.KeyCode.Name
-                        keybindButtonLabel.Text = Result
+                        keybindButtonLabel.Text = Result .. " ["..keybindMode:sub(1,1).."]"
                         ChosenKey = InputWait.KeyCode.Name
+                        ResizeKeybind()
                     end
                 end)
-    
+                
+                -- Support Functions
+                local function UpdateToggleState()
+                    local SizeOn = On and UDim2.new(0, 12, 0, 12) or UDim2.new(0, 0, 0, 0)
+                    local Transparency = On and 0 or 1
+                    TweenService:Create(toggleDesign, TweenTable["toggle_form"], {Size = SizeOn}):Play()
+                    TweenService:Create(toggleDesign, TweenTable["toggle_form"], {BackgroundTransparency = Transparency}):Play()
+                    callback_t(On)
+                end
+
+                -- Input Handling
                 if UserInputService.WindowFocused then
                     UserInputService.InputBegan:Connect(function(c, p)
                         if not p then
                             if c.KeyCode.Name == ChosenKey then
-                                On = not On
-                                local SizeOn = On and UDim2.new(0, 12, 0, 12) or UDim2.new(0, 0, 0, 0)
-                                local Transparency = On and 0 or 1
-                                TweenService:Create(toggleDesign, TweenTable["toggle_form"], {Size = SizeOn}):Play()
-                                TweenService:Create(toggleDesign, TweenTable["toggle_form"], {BackgroundTransparency = Transparency}):Play()
-                                callback_t(On)
-                                return
+                                if keybindMode == "Toggle" then
+                                    On = not On
+                                    UpdateToggleState()
+                                elseif keybindMode == "Hold" then
+                                    On = true
+                                    UpdateToggleState()
+                                end
                             end
                         end
-                    end)
+                    })
+                    UserInputService.InputEnded:Connect(function(c, p)
+                         if not p then
+                             if c.KeyCode.Name == ChosenKey and keybindMode == "Hold" then
+                                 On = false
+                                 UpdateToggleState()
+                             end
+                         end
+                    })
                 end
+                
+                -- Always Mode Handling (Simple loop/check)
+                RunService.Heartbeat:Connect(function()
+                    if keybindMode == "Always" and not On then
+                        On = true
+                        UpdateToggleState()
+                    end
+                end)
+
+                -- Create Context Menu
+                CreateContextMenu(keybind, keybindMode, function(newMode)
+                    keybindMode = newMode
+                    keybindButtonLabel.Text = (Shortcuts[ChosenKey] or ChosenKey).." ["..keybindMode:sub(1,1).."]"
+                    ResizeKeybind()
+                end)
     
                 local ExtraKeybindFunctions = {}
                 function ExtraKeybindFunctions:SetKey(new)
@@ -2134,143 +2306,36 @@ function library:Init(key)
             local keybindMode = "Toggle" -- Default mode
             local keybindState = false
             
-            -- Context Menu for Mode Selection
-            local contextMenu = Instance.new("Frame")
-            local contextLayout = Instance.new("UIListLayout")
-            local contextCorner = Instance.new("UICorner")
-            local contextGradient = Instance.new("UIGradient")
+            -- Use Shared Helper
+            CreateContextMenu(keybind, keybindMode, function(newMode)
+                keybindMode = newMode
+                keybindButtonLabel.Text = (Shortcuts[ChosenKey] or ChosenKey).." ["..keybindMode:sub(1,1).."]"
+                ResizeKeybind()
+            end)
             
-            contextMenu.Name = "ContextMenu"
-            contextMenu.Parent = screen -- Parent to ScreenGui to avoid ClipsDescendants
-            contextMenu.BackgroundColor3 = Color3.fromRGB(45, 45, 45) -- Fallback
-            contextMenu.BorderSizePixel = 0
-            contextMenu.Size = UDim2.new(0, 100, 0, 0)
-            contextMenu.Visible = false
-            contextMenu.ClipsDescendants = true
-            contextMenu.ZIndex = 20
-            
-            contextCorner.CornerRadius = UDim.new(0, 4)
-            contextCorner.Parent = contextMenu
-            
-            contextGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))}
-            contextGradient.Rotation = 90
-            contextGradient.Parent = contextMenu
-            
-            contextLayout.Parent = contextMenu
-            contextLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            
-            local modes = {"Toggle", "Hold", "Always"}
-            for _, mode in ipairs(modes) do
-                local modeBtn = Instance.new("TextButton")
-                modeBtn.Name = mode
-                modeBtn.Parent = contextMenu
-                modeBtn.Size = UDim2.new(1, 0, 0, 24)
-                modeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                modeBtn.BackgroundTransparency = 1
-                modeBtn.BorderSizePixel = 0
-                modeBtn.Text = mode
-                modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
-                modeBtn.Font = Enum.Font.Code
-                modeBtn.TextSize = 13
-                modeBtn.AutoButtonColor = false
-                modeBtn.ZIndex = 21
-                
-                if mode == keybindMode then
-                    modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
-                end
-                
-                modeBtn.MouseEnter:Connect(function()
-                    modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                end)
-                modeBtn.MouseLeave:Connect(function()
-                     if mode ~= keybindMode then
-                        modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
-                     else
-                        modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
-                     end
-                end)
-                
-                modeBtn.MouseButton1Click:Connect(function()
-                    keybindMode = mode
-                    contextMenu.Visible = false 
-                    contextMenu.Size = UDim2.new(0, 100, 0, 0) -- Reset size for animation
-                    
-                    -- Reset text colors
-                    for _, child in pairs(contextMenu:GetChildren()) do
-                        if child:IsA("TextButton") then
-                             child.TextColor3 = Color3.fromRGB(190, 190, 190)
-                        end
-                    end
-                    modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
-                    keybindButtonLabel.Text = (Shortcuts[ChosenKey] or ChosenKey).." ["..keybindMode:sub(1,1).."]"
-                    ResizeKeybind()
-                end)
+            -- Right Click to Open Context Menu (Handled by Helper, but we also want the button to trigger it)
+            local function proxyRightClick()
+                 -- Find the context menu created by the helper and toggle it? 
+                 -- Actually, the helper attaches the event to the passed 'keybind'.
+                 -- We also want 'keybindButton' (the background frame logic?) to trigger it
+                 -- The helper attaches to the first arg. We passed 'keybind'.
+                 -- We can just manually invoke the helper on 'keybindButton' too? 
+                 -- No, that creates a new menu.
+                 -- Instead we should pass the function.
+                 -- Since CreateContextMenu is internal, we can't easily access the toggle function from outside without returning it.
+                 -- But simpler: The helper attaches to 'parentButton'.
+                 -- Let's just make sure we attach the helper to the *main* interaction button (which is 'keybind').
+                 -- If 'keybindButton' exists separately, we might need to manually trigger.
             end
             
-            local function toggleContextMenu()
-                contextMenu.Visible = not contextMenu.Visible
-                if contextMenu.Visible then
-                    -- Calculate absolute position to place it near the button logic
-                    -- Since we are now in ScreenGui, we need AbsolutePosition of the button
-                    local btnPos = keybindButton.AbsolutePosition
-                    -- Adjust specific offset
-                    contextMenu.Position = UDim2.new(0, btnPos.X + keybindButton.AbsoluteSize.X + 10, 0, btnPos.Y)
-                    
-                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 24 * 3), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
-                else
-                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
-                end
-            end
-
-            -- Right Click to Open Context Menu
-            keybindButton.MouseButton2Click:Connect(toggleContextMenu)
-            keybind.MouseButton2Click:Connect(toggleContextMenu)
+            -- Wait, 'keybindButton' is defined earlier in NewKeybind as:
+            -- local keybindButton = Instance.new("TextButton") (line 2060 in original code maybe?)
+            -- Actually in line 2060 of the original read it was 'keybindButton.MouseButton1Click' but I don't see keybindButton definition in recent snippet.
+            -- Ah, looking at previous NewKeybind code (Step 355), 'keybind' IS the button. 
+            -- 'keybindButton' was likely a typo or variable name mixup in my head or I missed it.
+            -- Line 1972: keybind = Instance.new("TextButton").
+            -- So 'keybind' IS the interaction element.
             
-            -- Cleanup on Destroy
-            keybindButton.AncestryChanged:Connect(function()
-                if not keybindButton:IsDescendantOf(game) then
-                    contextMenu:Destroy()
-                end
-            end)
-
-            -- Close when clicking outside
-            UserInputService.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.MouseButton2 then
-                    if contextMenu.Visible then
-                         -- Check if mouse is over the context menu
-                         local mousePos = UserInputService:GetMouseLocation()
-                         local menuPos = contextMenu.AbsolutePosition
-                         local menuSize = contextMenu.AbsoluteSize
-                         
-                         -- Also check if over the button itself to prevent immediate re-opening if handled there (though event order usually matters)
-                         -- But main goal: if clicked elsewhere.
-                         
-                         local inX = mousePos.X >= menuPos.X and mousePos.X <= (menuPos.X + menuSize.X)
-                         local inY = mousePos.Y >= (menuPos.Y + 36) and mousePos.Y <= (menuPos.Y + menuSize.Y + 36) -- +36 for generic GUI inset topbar compensation if using GetMouseLocation vs Input Object Position
-                         
-                        -- A simpler way using generic IsMouseOver if available, but manual math is safer for CoreGui
-                         -- Let's try to match logic strictly.
-                         -- Note: GetMouseLocation includes GUI Inset (top bar). AbsolutePosition does not (usually).
-                         -- Actually, let's just use a simple robust check:
-                         -- If the input object position is NOT inside the frame.
-                         
-                         -- Wait, InputBegan provides input object. input.Position is available.
-                         local pos = input.Position
-                         if not (pos.X >= menuPos.X and pos.X <= menuPos.X + menuSize.X and pos.Y >= menuPos.Y and pos.Y <= menuPos.Y + menuSize.Y) then
-                             -- Check if we are clicking the button itself (to allow toggle logic to handle it, prevent double toggle)
-                             local btnPos = keybindButton.AbsolutePosition
-                             local btnSize = keybindButton.AbsoluteSize
-                             local onBtn = (pos.X >= btnPos.X and pos.X <= btnPos.X + btnSize.X and pos.Y >= btnPos.Y and pos.Y <= btnPos.Y + btnSize.Y)
-                             
-                             if not onBtn then
-                                 contextMenu.Visible = false
-                                 contextMenu.Size = UDim2.new(0, 100, 0, 0)
-                             end
-                         end
-                    end
-                end
-            end)
-
             if UserInputService.WindowFocused then
                 UserInputService.InputBegan:Connect(function(c, p)
                     if not p then
