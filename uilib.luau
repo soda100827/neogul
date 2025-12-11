@@ -2069,22 +2069,118 @@ function library:Init(key)
                 end
             end)
 
+            local keybindMode = "Toggle" -- Default mode
+            local keybindState = false
+            
+            -- Context Menu for Mode Selection
+            local contextMenu = Instance.new("Frame")
+            local contextLayout = Instance.new("UIListLayout")
+            
+            contextMenu.Name = "ContextMenu"
+            contextMenu.Parent = keybindFrame
+            contextMenu.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            contextMenu.BorderSizePixel = 0
+            contextMenu.Size = UDim2.new(0, 100, 0, 0)
+            contextMenu.Position = UDim2.new(1, -110, 0, 0)
+            contextMenu.Visible = false
+            contextMenu.ClipsDescendants = true
+            contextMenu.ZIndex = 10
+            
+            contextLayout.Parent = contextMenu
+            contextLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            
+            local modes = {"Toggle", "Hold", "Always"}
+            for _, mode in ipairs(modes) do
+                local modeBtn = Instance.new("TextButton")
+                modeBtn.Name = mode
+                modeBtn.Parent = contextMenu
+                modeBtn.Size = UDim2.new(1, 0, 0, 24)
+                modeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                modeBtn.BorderSizePixel = 0
+                modeBtn.Text = mode
+                modeBtn.TextColor3 = Color3.fromRGB(190, 190, 190)
+                modeBtn.Font = Enum.Font.Code
+                modeBtn.TextSize = 13
+                modeBtn.AutoButtonColor = false
+                
+                if mode == keybindMode then
+                    modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
+                end
+                
+                modeBtn.MouseEnter:Connect(function()
+                    modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                end)
+                modeBtn.MouseLeave:Connect(function()
+                     modeBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+                end)
+                
+                modeBtn.MouseButton1Click:Connect(function()
+                    keybindMode = mode
+                    contextMenu.Visible = false
+                    -- Reset text colors
+                    for _, child in pairs(contextMenu:GetChildren()) do
+                        if child:IsA("TextButton") then
+                             child.TextColor3 = Color3.fromRGB(190, 190, 190)
+                        end
+                    end
+                    modeBtn.TextColor3 = Color3.fromRGB(159, 115, 255)
+                    keybindButtonLabel.Text = (Shortcuts[ChosenKey] or ChosenKey).." ["..keybindMode:sub(1,1).."]"
+                    ResizeKeybind()
+                end)
+            end
+            
+            -- Right Click to Open Context Menu
+            keybindButton.MouseButton2Click:Connect(function()
+                contextMenu.Visible = not contextMenu.Visible
+                 if contextMenu.Visible then
+                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 24 * 3), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+                 else
+                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+                 end
+            end)
+            
+            keybind.MouseButton2Click:Connect(function()
+                 contextMenu.Visible = not contextMenu.Visible
+                 if contextMenu.Visible then
+                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 24 * 3), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+                 else
+                    contextMenu:TweenSize(UDim2.new(0, 100, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.2, true)
+                 end
+            end)
+
             if UserInputService.WindowFocused then
                 UserInputService.InputBegan:Connect(function(c, p)
                     if not p then
                         if c.KeyCode.Name == ChosenKey then
-                            callback(ChosenKey)
-                            return
+                            if keybindMode == "Toggle" then
+                                keybindState = not keybindState
+                                callback(ChosenKey, keybindState, keybindMode)
+                            elseif keybindMode == "Hold" then
+                                keybindState = true
+                                callback(ChosenKey, keybindState, keybindMode)
+                            end
                         end
                     end
                 end)
+                
+                UserInputService.InputEnded:Connect(function(c, p)
+                    if not p then
+                         if c.KeyCode.Name == ChosenKey and keybindMode == "Hold" then
+                              keybindState = false
+                              callback(ChosenKey, keybindState, keybindMode)
+                         end
+                    end
+                end)
             end
+            
+            -- Always mode loop (optional, or handled by callback logic)
+            -- For simplicity, 'Always' mode just keeps state true 
 
             UpdatePageSize()
 
             local KeybindFunctions = {}
             function KeybindFunctions:Fire()
-                callback(ChosenKey)
+                callback(ChosenKey, true, keybindMode)
                 return KeybindFunctions
             end
             --
@@ -2097,7 +2193,7 @@ function library:Init(key)
             function KeybindFunctions:SetKey(new)
                 new = new or ChosenKey.Name
                 ChosenKey = new.Name
-                keybindButtonLabel.Text = new.Name
+                keybindButtonLabel.Text = new.Name .. " ["..keybindMode:sub(1,1).."]"
                 return KeybindFunctions
             end
             --
@@ -2115,6 +2211,10 @@ function library:Init(key)
             function KeybindFunctions:Show()
                 keybindFrame.Visible = true
                 return KeybindFunctions
+            end
+            function KeybindFunctions:GetState()
+                 if keybindMode == "Always" then return true end
+                 return keybindState
             end
             return KeybindFunctions
         end
@@ -3586,16 +3686,25 @@ function library:Init(key)
     TabLibrary.IsFirst = true
     
     -- Populate Settings
+    -- Populate Settings
     Settings:NewSection("Menu")
-    Settings:NewKeybind("Keybind", key, function(v)
+    Settings:NewKeybind("Turn Off UI (Menu Key)", key, function(v)
         local k = v
         if type(v) == "string" then
            k = Enum.KeyCode[v]
         end
         TabLibrary:UpdateKeybind(k)
     end)
-    Settings:NewButton("Unload", function()
+    Settings:NewButton("Unload UI", function()
         TabLibrary:Remove()
+    end)
+    
+    Settings:NewSection("Visuals")
+    Settings:NewToggle("Show Watermark", true, function(state)
+        -- Logic to toggle watermark visibility if watermark object is accessible
+        if CoreGuiService:FindFirstChild("watermark") then
+             CoreGuiService.watermark.Enabled = state
+        end
     end)
 
     return TabLibrary
