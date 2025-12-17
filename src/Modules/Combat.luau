@@ -166,29 +166,42 @@ local function GetRagebotTarget()
     local closestPlayer = nil
     local shortestDistance = math.huge
 
-    if FighterController and FighterController.Objects then
+     if FighterController and FighterController.Objects then
         for _, fighter in pairs(FighterController.Objects) do
              local player = fighter.Player
-             -- Granular Debug
-             if Toggles.Ragebot and Toggles.Ragebot.Value and math.random() > 0.98 then
-                 local info = "Unknown"
-                 if player then info = player.Name else info = "NoPlayer" end
-                 local alive = fighter:IsAlive() and "Alive" or "Dead"
-                 local entity = (fighter.Entity and fighter.Entity.RootPart) and "HasRoot" or "NoRoot"
-                 local team = "N/A"
-                 if player then team = tostring(player.Team) end
-                 
-                 print("[Ragebot Debug] Checking: " .. info .. " | " .. alive .. " | " .. entity .. " | Team: " .. team)
-             end
-
+             
              if player and player ~= LocalPlayer then
                   -- Entity / Alive Check
                   if fighter.Entity and fighter.Entity.RootPart and fighter:IsAlive() then
                        local root = fighter.Entity.RootPart
                        
-                       -- Team Check
-                       if Toggles.Ragebot and Toggles.AimbotTeamCheck.Value and player.Team == LocalPlayer.Team then
-                            -- print("[Ragebot Debug] Valid Player but Team Mate: " .. player.Name)
+                       -- Team Check (TeamID Based)
+                       local isTeammate = false
+                       if Toggles.Ragebot and Toggles.AimbotTeamCheck.Value then
+                           if FighterController.LocalFighter and FighterController.LocalFighter.Data and fighter.Data then
+                               local myTeamID = FighterController.LocalFighter.Data.TeamID
+                               local targetTeamID = fighter.Data.TeamID
+                               
+                               if myTeamID == targetTeamID then
+                                   isTeammate = true
+                               end
+                           else
+                                -- Fallback to legacy check if Data is missing (unlikely if loop works)
+                                if player.Team and LocalPlayer.Team and player.Team == LocalPlayer.Team then
+                                    isTeammate = true
+                                end
+                           end
+                       end
+                       
+                       -- Granular Debug
+                       if Toggles.Ragebot and Toggles.Ragebot.Value and math.random() > 0.98 then
+                             local info = player and player.Name or "Unknown"
+                             local myID = (FighterController.LocalFighter and FighterController.LocalFighter.Data) and tostring(FighterController.LocalFighter.Data.TeamID) or "nil"
+                             local tID = (fighter.Data) and tostring(fighter.Data.TeamID) or "nil"
+                             print("[Ragebot] Scan: " .. info .. " | TID: " .. tID .. " vs " .. myID .. " | Mate: " .. tostring(isTeammate))
+                       end
+
+                       if isTeammate then
                             continue
                        end
                        
