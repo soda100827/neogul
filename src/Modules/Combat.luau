@@ -146,27 +146,69 @@ task.spawn(function()
     end
 end)
 -- Ragebot & Target Strafe Implementation
+local FighterController -- defined globally for reuse
+
 local function GetRagebotTarget()
+    -- Lazy load FighterController if not loaded
+    if not FighterController then
+        local success, result = pcall(function()
+            return require(LocalPlayer.PlayerScripts.Controllers.FighterController)
+        end)
+        if success then
+            FighterController = result
+        else
+            -- Check if it's already defined in the auto-fire task scope, 
+            -- but better to get it here.
+            -- warn("[Ragebot] FighterController not found for Target Search") 
+        end
+    end
+
     local closestPlayer = nil
     local shortestDistance = math.huge
 
-    for _, player in pairs(Players:GetPlayers()) do 
-        if player ~= LocalPlayer then
-            local character = player.Character
-            local humanoid = character and character:FindFirstChild("Humanoid")
-            local root = character and character:FindFirstChild("HumanoidRootPart")
+    if FighterController and FighterController.Objects then
+        for _, fighter in pairs(FighterController.Objects) do
+             local player = fighter.Player
+             if player and player ~= LocalPlayer then
+                  -- Entity / Alive Check
+                  if fighter.Entity and fighter.Entity.RootPart and fighter:IsAlive() then
+                       local root = fighter.Entity.RootPart
+                       
+                       -- Team Check
+                       if Toggles.Ragebot and Toggles.AimbotTeamCheck.Value and player.Team == LocalPlayer.Team then
+                            continue
+                       end
+                       
+                        -- Visibility / WallCheck (Optional, currently distance only)
+                       local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                       
+                       if distance < shortestDistance then
+                           shortestDistance = distance
+                           closestPlayer = player
+                       end
+                  end
+             end
+        end
+    else
+        -- Fallback to standard player list if Controller fails
+        for _, player in pairs(Players:GetPlayers()) do 
+            if player ~= LocalPlayer then
+                local character = player.Character
+                local humanoid = character and character:FindFirstChild("Humanoid")
+                local root = character and character:FindFirstChild("HumanoidRootPart")
 
-            if character and humanoid and humanoid.Health > 0 and root then
-                -- Team Check
-                if Toggles.Ragebot and Toggles.AimbotTeamCheck.Value and player.Team == LocalPlayer.Team then
-                    continue
-                end
-                
-                local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                
-                if distance < shortestDistance then
-                    shortestDistance = distance
-                    closestPlayer = player
+                if character and humanoid and humanoid.Health > 0 and root then
+                    -- Team Check
+                    if Toggles.Ragebot and Toggles.AimbotTeamCheck.Value and player.Team == LocalPlayer.Team then
+                        continue
+                    end
+                    
+                    local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                    
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = player
+                    end
                 end
             end
         end
@@ -177,7 +219,7 @@ local function GetRagebotTarget()
         if closestPlayer then
             print("[Ragebot] Target found: " .. closestPlayer.Name .. " Dist: " .. math.floor(shortestDistance))
         else
-            print("[Ragebot] No target found")
+            print("[Ragebot] No target found (Scanned Fighters: " .. (FighterController and table.getn(FighterController.Objects) or "nil") .. ")")
         end
     end
     
