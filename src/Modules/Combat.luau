@@ -162,8 +162,6 @@ local function GetRagebotTarget()
                     continue
                 end
                 
-                -- Ragebot has no FOV limit usually, or uses a large one. 
-                -- We select based on distance for now, or visibility if wallcheck is considered.
                 local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
                 
                 if distance < shortestDistance then
@@ -173,6 +171,16 @@ local function GetRagebotTarget()
             end
         end
     end
+    
+    -- Debug Print (Throttle to avoid lag)
+    if Toggles.Ragebot and Toggles.Ragebot.Value and math.random() > 0.95 then
+        if closestPlayer then
+            print("[Ragebot] Target found: " .. closestPlayer.Name .. " Dist: " .. math.floor(shortestDistance))
+        else
+            print("[Ragebot] No target found")
+        end
+    end
+    
     return closestPlayer
 end
 
@@ -185,7 +193,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if Toggles.Ragebot and Toggles.Ragebot.Value then
         target = GetRagebotTarget()
     elseif Toggles.TargetStrafe and Toggles.TargetStrafe.Value and Options.TargetStrafeKey:GetState() then
-         -- Manual Target Strafe (Legit)
          target = GetClosestPlayerToCursor()
          if not target then 
              local p = GetRagebotTarget()
@@ -207,7 +214,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
             
             strafeAngle = strafeAngle + (deltaTime * speed)
             
-            -- Star Pattern / Erratic Movement
             local dynamicRadius = xOff * 5 + (math.sin(strafeAngle * 3) * 5)
             local dynamicHeight = yOff * 5 + (math.cos(strafeAngle * 5) * 3)
             
@@ -245,25 +251,40 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     
     if Toggles.Ragebot and Toggles.Ragebot.Value or (Toggles.AimbotEnabled and Toggles.AimbotEnabled.Value) then
-       -- Hook generic projectile/cast methods
-       if method == "FireServer" and (string.find(self.Name, "Bullet") or string.find(self.Name, "Cast") or string.find(self.Name, "Fire") or string.find(self.Name, "Shoot") or string.find(self.Name, "Hit")) then
-            local target = GetRagebotTarget()
-            if target and target.Character and target.Character:FindFirstChild("Head") then
-                local headPos = target.Character.Head.Position
+       if method == "FireServer" then
+           local name = self.Name
+           if string.find(name, "Bullet") or string.find(name, "Cast") or string.find(name, "Fire") or string.find(name, "Shoot") or string.find(name, "Hit") or string.find(name, "Input") then
                 
-                 for i, v in pairs(args) do
-                    if typeof(v) == "Vector3" then
-                        -- Replace direction vector
-                        -- We assume the vector with largest magnitude or unit vector is the direction
-                        args[i] = (headPos - Camera.CFrame.Position).Unit * v.Magnitude 
-                    elseif typeof(v) == "CFrame" then
-                        -- Replace CFrame lookAt
-                         args[i] = CFrame.new(args[i].Position, headPos)
+                -- Debug: Print matched remote
+                -- print("[SilentAim] Intercepted Remote: " .. name) 
+
+                local target = GetRagebotTarget()
+                if target and target.Character and target.Character:FindFirstChild("Head") then
+                    local headPos = target.Character.Head.Position
+                    local camPos = Camera.CFrame.Position
+                    
+                     for i, v in pairs(args) do
+                        if typeof(v) == "Vector3" then
+                            local dir = (headPos - camPos).Unit
+                            
+                            if v.Magnitude <= 1.1 and v.Magnitude >= 0.9 then
+                                -- print("[SilentAim] Redirecting Direction Vector")
+                                args[i] = dir
+                            elseif v.Magnitude > 10 then 
+                                -- print("[SilentAim] Redirecting Position Vector")
+                                args[i] = headPos
+                            else
+                                args[i] = headPos
+                            end
+                        elseif typeof(v) == "CFrame" then
+                             -- print("[SilentAim] Redirecting CFrame")
+                             args[i] = CFrame.new(args[i].Position, headPos)
+                        end
                     end
+                    
+                    return oldNamecall(self, unpack(args))
                 end
-                
-                return oldNamecall(self, unpack(args))
-            end
+           end
        end
     end
     
@@ -272,19 +293,51 @@ end)
 
 -- Auto Fire (Using MechanicsController)
 task.spawn(function()
-    local MechanicsController = require(LocalPlayer.PlayerScripts.Controllers:WaitForChild("MechanicsController"))
+    print("[Ragebot] Loop Initializing...")
+    -- Safe Load MechanicsController
+    local MechanicsController = nil
+    local success, err = pcall(function()
+        local controllers = LocalPlayer:WaitForChild("PlayerScripts", 10):WaitForChild("Controllers", 10)
+        if not controllers then return error("Controllers folder not found") end
+        local module = controllers:WaitForChild("MechanicsController", 10)
+        if not module then return error("MechanicsController module not found") end
+        MechanicsController = require(module)
+    end)
+
+    if not success or not MechanicsController then
+        warn("Failed to load MechanicsController for Ragebot: " .. tostring(err))
+        Library:Notify("Ragebot Warning: MechanicsController not found. " .. tostring(err))
+    else
+        print("[Ragebot] MechanicsController loaded successfully.")
+    end
     
     while true do
         task.wait(0.1) -- Fire rate
         if Toggles.Ragebot and Toggles.Ragebot.Value then
             local target = GetRagebotTarget()
             if target then
-                -- Use the game's internal controller to fire
                 if MechanicsController then
-                    MechanicsController:EquippedItemInput("StartShooting")
-                    -- Short delay simulating click duration, might not be needed for full auto, but safe
-                    task.wait(0.05) 
-                    MechanicsController:EquippedItemInput("FinishShooting")
+                    -- Verify LocalFighter exists before input
+                    if MechanicsController.LocalFighter then
+                         -- print("[Ragebot] Attempting Auto Fire via Controller...")
+                         MechanicsController:EquippedItemInput("StartShooting")
+                         task.wait(0.05) 
+                         MechanicsController:EquippedItemInput("FinishShooting")
+                    else
+                         if math.random() > 0.95 then
+                            warn("[Ragebot] LocalFighter is nil in MechanicsController")
+                         end
+                    end
+                else
+                    -- Fallback 
+                     local char = LocalPlayer.Character
+                     if char then
+                         local tool = char:FindFirstChildWhichIsA("Tool")
+                         if tool then 
+                             -- print("[Ragebot] Fallback: Tool:Activate()")
+                             tool:Activate() 
+                         end
+                     end
                 end
             end
         end
