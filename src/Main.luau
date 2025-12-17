@@ -32,7 +32,7 @@ end
 -- For standard 'loadfile' execution, we might need a helper to require files.
 
 -- Configuration
-local Repository = "https://raw.githubusercontent.com/USERNAME/REPO/main/" -- Change this to your repository URL
+local Repository = "https://raw.githubusercontent.com/soda100827/neogul/main/"
 
 local function safeLoad(path)
     -- Remove 'rivals_neogul/src/' if it was added for local testing
