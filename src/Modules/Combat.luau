@@ -169,6 +169,18 @@ local function GetRagebotTarget()
     if FighterController and FighterController.Objects then
         for _, fighter in pairs(FighterController.Objects) do
              local player = fighter.Player
+             -- Granular Debug
+             if Toggles.Ragebot and Toggles.Ragebot.Value and math.random() > 0.98 then
+                 local info = "Unknown"
+                 if player then info = player.Name else info = "NoPlayer" end
+                 local alive = fighter:IsAlive() and "Alive" or "Dead"
+                 local entity = (fighter.Entity and fighter.Entity.RootPart) and "HasRoot" or "NoRoot"
+                 local team = "N/A"
+                 if player then team = tostring(player.Team) end
+                 
+                 print("[Ragebot Debug] Checking: " .. info .. " | " .. alive .. " | " .. entity .. " | Team: " .. team)
+             end
+
              if player and player ~= LocalPlayer then
                   -- Entity / Alive Check
                   if fighter.Entity and fighter.Entity.RootPart and fighter:IsAlive() then
@@ -176,6 +188,7 @@ local function GetRagebotTarget()
                        
                        -- Team Check
                        if Toggles.Ragebot and Toggles.AimbotTeamCheck.Value and player.Team == LocalPlayer.Team then
+                            -- print("[Ragebot Debug] Valid Player but Team Mate: " .. player.Name)
                             continue
                        end
                        
