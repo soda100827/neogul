@@ -72,8 +72,40 @@ SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
 ThemeManager:SetFolder('MyScriptHub')
 SaveManager:SetFolder('MyScriptHub/rivals')
-SaveManager:BuildConfigSection(Globals.Tabs['UI Settings'])
-ThemeManager: ApplyToTab(Globals.Tabs['UI Settings'])
+
+-- UI Settings Hook for "Remove Autoload"
+local UISettingsTab = Globals.Tabs['UI Settings']
+local oldAddRightGroupbox = UISettingsTab.AddRightGroupbox
+
+UISettingsTab.AddRightGroupbox = function(self, name)
+    local groupbox = oldAddRightGroupbox(self, name)
+    if name == 'Configuration' then
+        local oldAddButton = groupbox.AddButton
+        groupbox.AddButton = function(self, text, func)
+            local button = oldAddButton(self, text, func)
+            if text == 'Set as autoload' then
+                button:AddButton('Remove Autoload', function()
+                    local autoloadPath = SaveManager.Folder .. '/settings/autoload.txt'
+                    if isfile(autoloadPath) then
+                        delfile(autoloadPath)
+                        if SaveManager.AutoloadLabel then
+                            SaveManager.AutoloadLabel:SetText('Current autoload config: none')
+                        end
+                        Library:Notify('Autoload removed. Reset to default.')
+                    else
+                        Library:Notify('No autoload config set.')
+                    end
+                end)
+            end
+            return button
+        end
+    end
+    return groupbox
+end
+
+SaveManager:BuildConfigSection(UISettingsTab)
+UISettingsTab.AddRightGroupbox = oldAddRightGroupbox
+ThemeManager:ApplyToTab(UISettingsTab)
 SaveManager:LoadAutoloadConfig()
 
 Library:Notify('Neogul Scripts Loaded!')
