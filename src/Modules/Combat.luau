@@ -163,7 +163,7 @@ local function GetRagebotTarget()
                 end
                 
                 -- Ragebot has no FOV limit usually, or uses a large one. 
-                -- We select based on distance for now.
+                -- We select based on distance for now, or visibility if wallcheck is considered.
                 local distance = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
                 
                 if distance < shortestDistance then
@@ -185,18 +185,14 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if Toggles.Ragebot and Toggles.Ragebot.Value then
         target = GetRagebotTarget()
     elseif Toggles.TargetStrafe and Toggles.TargetStrafe.Value and Options.TargetStrafeKey:GetState() then
-         -- Manual Target Strafe (Legit) - reuse Aimbot target or get closest
-         target = GetClosestPlayerToCursor() -- From existing function
+         -- Manual Target Strafe (Legit)
+         target = GetClosestPlayerToCursor()
          if not target then 
-            -- Fallback to closest player if cursor target not found
              local p = GetRagebotTarget()
              if p and p.Character then target = p.Character.HumanoidRootPart end
          end
-         -- If target is a Part, get the player object if needed, or just use the part
     end
 
-    -- Logic for Target Strafe
-    -- Condition: (Ragebot Enabled AND TargetStrafeRage Enabled AND Target Exists) OR (Manual Target Strafe Enabled AND Key Pressed AND Target Exists)
     local useStrafe = (Toggles.Ragebot and Toggles.Ragebot.Value and Toggles.TargetStrafeRage and Toggles.TargetStrafeRage.Value and target)
                    or (Toggles.TargetStrafe and Toggles.TargetStrafe.Value and Options.TargetStrafeKey:GetState() and target)
 
@@ -205,7 +201,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
         if targetRoot and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local root = LocalPlayer.Character.HumanoidRootPart
             
-            local radius = 10 -- default radius? maybe add slider? using X/Y offset as proxy for now
             local speed = Options.TargetStrafeSpinSpeed.Value
             local xOff = Options.TargetStrafeXOffset.Value
             local yOff = Options.TargetStrafeYOffset.Value
@@ -213,7 +208,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
             strafeAngle = strafeAngle + (deltaTime * speed)
             
             -- Star Pattern / Erratic Movement
-            -- We modulate the radius or height with a sine wave to create a non-circular path
             local dynamicRadius = xOff * 5 + (math.sin(strafeAngle * 3) * 5)
             local dynamicHeight = yOff * 5 + (math.cos(strafeAngle * 5) * 3)
             
@@ -225,13 +219,12 @@ RunService.RenderStepped:Connect(function(deltaTime)
             
             local newPos = targetRoot.Position + offset
             
-            -- Set Velocity to 0 to prevent physics interference?
             if LocalPlayer.Character:FindFirstChild("Humanoid") then
                 LocalPlayer.Character.Humanoid.PlatformStand = true
             end
             
             root.CFrame = CFrame.new(newPos, targetRoot.Position)
-            root.Velocity = Vector3.new(0,0,0) -- Anti-prediction essentially
+            root.Velocity = Vector3.new(0,0,0)
         else
              if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
                 LocalPlayer.Character.Humanoid.PlatformStand = false
@@ -251,25 +244,20 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local args = {...}
     local method = getnamecallmethod()
     
-    if Toggles.Ragebot and Toggles.Ragebot.Value or (Toggles.AimbotEnabled and Toggles.AimbotEnabled.Value) then -- Use silent aim for legit too? or just rage?
-       -- Check if it looks like a bullet fire
-       -- Usually arguments involve a Vector3 (direction) or a CFrame
-       if method == "FireServer" and (string.find(self.Name, "Bullet") or string.find(self.Name, "Cast") or string.find(self.Name, "Fire") or string.find(self.Name, "Shoot")) then
+    if Toggles.Ragebot and Toggles.Ragebot.Value or (Toggles.AimbotEnabled and Toggles.AimbotEnabled.Value) then
+       -- Hook generic projectile/cast methods
+       if method == "FireServer" and (string.find(self.Name, "Bullet") or string.find(self.Name, "Cast") or string.find(self.Name, "Fire") or string.find(self.Name, "Shoot") or string.find(self.Name, "Hit")) then
             local target = GetRagebotTarget()
             if target and target.Character and target.Character:FindFirstChild("Head") then
-                -- Try to find the direction argument and modify it
-                -- This is highly game specific. Universal silent aim is hard.
-                -- We assume one of the args is a Vector3 direction or CFrame look at
-                
                 local headPos = target.Character.Head.Position
                 
                  for i, v in pairs(args) do
                     if typeof(v) == "Vector3" then
-                        -- Check if this vector is somewhat directional (unit vector or large magnitude diff)
-                         -- Simply replacing all Vector3s might break things, but it's "Universal"
-                         -- Better: Replace the one that looks like a direction
-                         args[i] = (headPos - Camera.CFrame.Position).Unit * v.Magnitude -- Maintain original magnitude
+                        -- Replace direction vector
+                        -- We assume the vector with largest magnitude or unit vector is the direction
+                        args[i] = (headPos - Camera.CFrame.Position).Unit * v.Magnitude 
                     elseif typeof(v) == "CFrame" then
+                        -- Replace CFrame lookAt
                          args[i] = CFrame.new(args[i].Position, headPos)
                     end
                 end
@@ -282,24 +270,23 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
--- Auto Fire (Attempts to fire detected remote)
--- Since we don't know the remote, we might just loop fire if we find one from the hook above? 
--- Or we just simulate mouse clicks. User asked for Remote auto fire.
--- Without scanning the game, we can't 'find' the remote easily.
--- For now, fallback to mouse1click if Ragebot is on.
+-- Auto Fire (Using MechanicsController)
 task.spawn(function()
+    local MechanicsController = require(LocalPlayer.PlayerScripts.Controllers:WaitForChild("MechanicsController"))
+    
     while true do
         task.wait(0.1) -- Fire rate
-        if Toggles.Ragebot and Toggles.Ragebot.Value and GetRagebotTarget() then
-             -- mouse1click() -- User said "not mouse", but without remote name...
-             -- We can try to fire the Tool's Activate?
-             local char = LocalPlayer.Character
-             if char then
-                 local tool = char:FindFirstChildWhichIsA("Tool")
-                 if tool then
-                     tool:Activate()
-                 end
-             end
+        if Toggles.Ragebot and Toggles.Ragebot.Value then
+            local target = GetRagebotTarget()
+            if target then
+                -- Use the game's internal controller to fire
+                if MechanicsController then
+                    MechanicsController:EquippedItemInput("StartShooting")
+                    -- Short delay simulating click duration, might not be needed for full auto, but safe
+                    task.wait(0.05) 
+                    MechanicsController:EquippedItemInput("FinishShooting")
+                end
+            end
         end
     end
 end)
